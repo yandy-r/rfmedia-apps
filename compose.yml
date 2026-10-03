@@ -1818,3 +1818,96 @@ services:
       - ${DOCKER_DIR}/immich-postgres:/var/lib/postgresql/data
     shm_size: 128mb
     image: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0@sha256:bcf63357191b76a916ae5eb93464d65c07511da41e3bf7a8416db519b40b1c23
+
+  # Native API-key auth guards Traefik + tsdproxy ingress (no Authentik, no host ports).
+  # AMD GPU via ROCm: gfx1201 render node + /dev/kfd are mapped (no privileged);
+  # host needs amdgpu kernel driver only (no ROCm userland install).
+  llama:
+    <<: *service-base
+    container_name: llama
+    hostname: llama
+    user: "${PUID}:${PGID}"
+    group_add:
+      # render group for /dev/dri/renderD129 access (host amdgpu render node)
+      - ${LLAMA_RENDER_GID:-993}
+    networks:
+      apps: {}
+    logging: *logging-default
+    healthcheck:
+      test: curl --fail --silent http://localhost:8080/health || exit 1
+      interval: 15s
+      retries: 5
+      # 14B Q4 (~8.4 GB) mmap load from cold cache can take minutes
+      start_period: 300s
+      timeout: 5s
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs:
+      # ROCm kernel/compute cache lives under XDG_CACHE_HOME=/tmp
+      - /tmp:rw,noexec,nosuid,nodev,size=256m
+    environment:
+      TZ: ${TZ}
+      HOME: /tmp
+      XDG_CACHE_HOME: /tmp
+    command:
+      - --api-key-file
+      - /run/secrets/llama-api-keys
+      - --model
+      - /models/${LLAMA_MODEL_FILE:-gemma-3-1b-it-Q4_K_M.gguf}
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8080"
+      # Explicit GPU: fail loudly instead of silently falling back to CPU
+      - --device
+      - ROCm0
+      - --gpu-layers
+      - "99"
+      - --ctx-size
+      - "32768"
+      - --parallel
+      - "1"
+      # Bound host-side prompt cache; model mmap/offload needs >4 GiB at load.
+      - --cache-ram
+      - "512"
+      - --no-ui
+      # Include backend device and layer-offload evidence in startup logs.
+      - --log-verbosity
+      - "4"
+    labels:
+      traefik.enable: true
+      traefik.http.routers.llama.rule: Host(`llama.${DOMAIN}`)
+      traefik.http.routers.llama.entrypoints: websecure
+      traefik.http.routers.llama.tls: true
+      traefik.http.routers.llama.tls.certresolver: letsencrypt
+      traefik.http.routers.llama.tls.domains[0].main: llama.${DOMAIN}
+      traefik.http.services.llama.loadbalancer.server.port: 8080
+      traefik.http.services.llama.loadbalancer.server.scheme: http
+      <<: *tsdproxy-rfapps
+      tsdproxy.name: "llama"
+      tsdproxy.dash.label: "llama"
+      tsdproxy.port.1: "443/https:8080/http"
+    expose:
+      - "8080"
+    devices:
+      # AMD RX 9070 XT render node (stable by-path; Intel iGPU is NOT mapped)
+      # + /dev/kfd for ROCm compute (both group render 993; gid stays 993).
+      # Long syntax: the by-path name contains a colon, short syntax is ambiguous.
+      - source: /dev/dri/by-path/pci-0000:07:00.0-render
+        target: /dev/dri/renderD129
+        permissions: rw
+      - source: /dev/kfd
+        target: /dev/kfd
+        permissions: rw
+    volumes:
+      - ${DOCKER_DIR}/llama/models:/models:ro
+      - type: bind
+        source: ${DOCKER_DIR}/llama/api-keys
+        target: /run/secrets/llama-api-keys
+        read_only: true
+        bind:
+          create_host_path: false
+    deploy:
+      resources: { limits: { cpus: "4.0", memory: 16G, pids: 128 } }
+    image: ghcr.io/ggml-org/llama.cpp:server-rocm-b11146@sha256:a4d07a422c64467bd3f4177b2721ba1e0bf1af187618a265b71e9cef9e830639
