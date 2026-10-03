@@ -1,0 +1,71 @@
+name: Security (Public-safe Intake)
+description: Track non-sensitive security hardening tasks. Do not disclose private vulnerability details here.
+title: "[security] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include exploit details, secrets, tokens, private URLs, or sensitive reproduction steps in this issue.
+        For private vulnerability disclosure, use the issue chooser link: `Private Security Report`.
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Safety Checklist
+      options:
+        - label: I confirm this report does not contain sensitive vulnerability details.
+          required: true
+        - label: I will use private reporting for any exploitable vulnerability information.
+          required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: Security Concern Summary
+      placeholder: High-level security concern without sensitive exploit details.
+    validations:
+      required: true
+  - type: dropdown
+    id: concern_type
+    attributes:
+      label: Concern Type
+      options:
+        - Configuration hardening
+        - Dependency risk
+        - Authentication/authorization
+        - Data handling
+        - Network exposure
+        - Other
+      default: 0
+    validations:
+      required: true
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity Estimate
+      options:
+        - Low
+        - Medium
+        - High
+      default: 1
+    validations:
+      required: true
+  - type: textarea
+    id: impacted_areas
+    attributes:
+      label: Impacted Areas
+      placeholder: Services, package paths, or workflows affected.
+    validations:
+      required: true
+  - type: textarea
+    id: mitigation
+    attributes:
+      label: Proposed Mitigation
+      placeholder: Hardening proposal or remediation direction.
+    validations:
+      required: true
+  - type: textarea
+    id: verification
+    attributes:
+      label: Verification Criteria
+      placeholder: How to confirm the remediation is effective.
+    validations:
+      required: true

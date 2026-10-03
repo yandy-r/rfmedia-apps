@@ -1,0 +1,7 @@
+log:
+  level: info
+runner:
+  labels:
+    - ubuntu-latest:docker://catthehacker/ubuntu:act-22.04
+    - ubuntu-24:docker://catthehacker/ubuntu:act-22.04
+    - node-22:docker://node:22-bullseye

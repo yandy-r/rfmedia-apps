@@ -1,0 +1,309 @@
+# Advanced Smart Filter Examples
+# These filters demonstrate complex nested boolean logic with AND/OR groups.
+#
+# YAML Indentation: Use 2 spaces per indent level (not tabs).
+# Nested groups allow building sophisticated filter expressions.
+#
+# Key concepts:
+#   - match: all  -> AND logic (all rules must match)
+#   - match: any  -> OR logic (at least one rule must match)
+#   - Rules can be field conditions OR nested groups
+#   - Nesting depth is unlimited (but keep it readable)
+#
+# Rating values: Use star ratings from 1.0 to 5.0 (e.g., 4.0 = 4 stars).
+# The evaluation engine converts to normalized 0-1 scale internally.
+
+filters:
+  # High-quality rock or alternative music
+  # Structure: rating >= 4 AND (genre contains Rock OR genre contains Alternative)
+  high-quality-rock:
+    match: all # Outer AND
+    rules:
+      - type: rule
+        field: rating
+        operator: ">="
+        value: 4.0 # 4+ stars
+      - type: group
+        match: any # Inner OR for genres
+        rules:
+          - type: rule
+            field: genre
+            operator: contains
+            value: Rock
+          - type: rule
+            field: genre
+            operator: contains
+            value: Alternative
+          - type: rule
+            field: genre
+            operator: contains
+            value: Metal
+
+  # Female pop artists collection
+  # Structure: rating >= 3.5 AND (artist contains any of the specified names)
+  female-pop-artists:
+    match: all
+    rules:
+      - type: rule
+        field: rating
+        operator: ">="
+        value: 3.5 # 3.5+ stars
+      - type: group
+        match: any # Any of these artists
+        rules:
+          - type: rule
+            field: artist
+            operator: contains
+            value: "Britney Spears"
+          - type: rule
+            field: artist
+            operator: contains
+            value: "Shakira"
+          - type: rule
+            field: artist
+            operator: contains
+            value: "Lady Gaga"
+          - type: rule
+            field: artist
+            operator: contains
+            value: "Taylor Swift"
+          - type: rule
+            field: artist
+            operator: contains
+            value: "Ariana Grande"
+
+  # Recent favorites - high rated tracks added recently
+  # Structure: rating >= 4.5 AND date_added within 30d
+  recent-favorites:
+    match: all
+    rules:
+      - type: rule
+        field: rating
+        operator: ">="
+        value: 4.5 # 4.5+ stars
+      - type: rule
+        field: date_added
+        operator: within
+        value: 30d
+
+  # Electronic dance music for parties
+  # Structure: (genre contains Electronic OR genre contains Dance OR genre contains EDM)
+  #            AND bpm >= 120 AND rating >= 3
+  party-electronic:
+    match: all
+    rules:
+      - type: group
+        match: any
+        rules:
+          - type: rule
+            field: genre
+            operator: contains
+            value: Electronic
+          - type: rule
+            field: genre
+            operator: contains
+            value: Dance
+          - type: rule
+            field: genre
+            operator: contains
+            value: EDM
+          - type: rule
+            field: genre
+            operator: contains
+            value: House
+          - type: rule
+            field: genre
+            operator: contains
+            value: Techno
+      - type: rule
+        field: bpm
+        operator: ">="
+        value: 120
+      - type: rule
+        field: rating
+        operator: ">="
+        value: 3.0 # 3+ stars
+
+  # Chill acoustic music for relaxation
+  # Structure: (genre contains Acoustic OR genre contains Folk OR genre contains Singer)
+  #            AND bpm <= 100 AND rating >= 3
+  chill-acoustic:
+    match: all
+    rules:
+      - type: group
+        match: any
+        rules:
+          - type: rule
+            field: genre
+            operator: contains
+            value: Acoustic
+          - type: rule
+            field: genre
+            operator: contains
+            value: Folk
+          - type: rule
+            field: genre
+            operator: contains
+            value: Singer-Songwriter
+          - type: rule
+            field: genre
+            operator: contains
+            value: Ambient
+      - type: rule
+        field: bpm
+        operator: "<="
+        value: 100
+      - type: rule
+        field: rating
+        operator: ">="
+        value: 3.0 # 3+ stars
+
+  # Classic rock from the golden era
+  # Structure: (year >= 1965 AND year <= 1985) AND genre contains Rock AND rating >= 3
+  classic-rock-era:
+    match: all
+    rules:
+      - type: rule
+        field: year
+        operator: ">="
+        value: 1965
+      - type: rule
+        field: year
+        operator: "<="
+        value: 1985
+      - type: rule
+        field: genre
+        operator: contains
+        value: Rock
+      - type: rule
+        field: rating
+        operator: ">="
+        value: 3.0 # 3+ stars
+
+  # Modern hits - recent years with high ratings
+  # Structure: year >= 2020 AND rating >= 4
+  modern-hits:
+    match: all
+    rules:
+      - type: rule
+        field: year
+        operator: ">="
+        value: 2020
+      - type: rule
+        field: rating
+        operator: ">="
+        value: 4.0 # 4+ stars
+
+  # Workout mix - high energy from various genres
+  # Structure: (bpm >= 130 OR (bpm >= 100 AND genre contains Hip-Hop))
+  #            AND rating >= 3.5
+  workout-mix:
+    match: all
+    rules:
+      - type: group
+        match: any # Either fast tempo OR moderate hip-hop
+        rules:
+          - type: rule
+            field: bpm
+            operator: ">="
+            value: 130
+          - type: group
+            match: all # Hip-hop at moderate tempo
+            rules:
+              - type: rule
+                field: bpm
+                operator: ">="
+                value: 100
+              - type: rule
+                field: genre
+                operator: contains
+                value: Hip-Hop
+      - type: rule
+        field: rating
+        operator: ">="
+        value: 3.5 # 3.5+ stars
+
+  # Jazz and blues collection
+  # Structure: (genre contains Jazz OR genre contains Blues) AND rating >= 3
+  jazz-blues:
+    match: all
+    rules:
+      - type: group
+        match: any
+        rules:
+          - type: rule
+            field: genre
+            operator: contains
+            value: Jazz
+          - type: rule
+            field: genre
+            operator: contains
+            value: Blues
+          - type: rule
+            field: genre
+            operator: contains
+            value: Soul
+      - type: rule
+        field: rating
+        operator: ">="
+        value: 3.0 # 3+ stars
+
+  # Decade collections - 90s music example
+  # Structure: year >= 1990 AND year <= 1999 AND rating >= 3
+  nineties-hits:
+    match: all
+    rules:
+      - type: rule
+        field: year
+        operator: ">="
+        value: 1990
+      - type: rule
+        field: year
+        operator: "<="
+        value: 1999
+      - type: rule
+        field: rating
+        operator: ">="
+        value: 3.0 # 3+ stars
+
+  # Complex multi-level nesting example
+  # Structure: rating >= 3.5 AND
+  #            ((genre contains Pop AND year >= 2010) OR
+  #             (genre contains Rock AND year < 2000) OR
+  #             (genre contains Electronic))
+  complex-mix:
+    match: all
+    rules:
+      - type: rule
+        field: rating
+        operator: ">="
+        value: 3.5 # 3.5+ stars
+      - type: group
+        match: any # One of these genre/era combinations
+        rules:
+          - type: group
+            match: all # Modern pop
+            rules:
+              - type: rule
+                field: genre
+                operator: contains
+                value: Pop
+              - type: rule
+                field: year
+                operator: ">="
+                value: 2010
+          - type: group
+            match: all # Classic rock
+            rules:
+              - type: rule
+                field: genre
+                operator: contains
+                value: Rock
+              - type: rule
+                field: year
+                operator: "<="
+                value: 1999
+          - type: rule
+            field: genre # Any electronic
+            operator: contains
+            value: Electronic

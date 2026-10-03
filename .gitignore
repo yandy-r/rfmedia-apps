@@ -1,0 +1,71 @@
+.pyc
+.env
+.env.keys
+.env.**
+!.env.example
+.venv*
+*.tgz
+Chart.lock
+*.tmp.*
+*.tmp
+temp/
+
+# Script configuration and runtime files
+scripts/.env
+logs/
+backups/
+
+# Ansible runtime files
+ansible/retry/
+*.retry
+*.completed.*.txt
+
+# Node.js
+node_modules/
+dist/
+coverage/
+packages/*/package-lock.json
+
+# pnpm
+pnpm-lock.yaml
+.pnpm-store/
+.pnpm-debug.log
+
+# Package runtime files
+.rfmedia.json
+packages/rfmedia-cli/.rfmedia.json
+packages/rfmedia-cli/.rfmedia.json.bak
+packages/rfmedia-cli/rfmedia@*
+packages/rfmedia-cli/tsx
+packages/rfapps-cli/rfapps@*
+packages/rfmedia-cli/rf-media@*
+
+# Claude
+.claude/settings.local.json
+.claude/worktrees/
+
+# Cursor
+.cursor/worktrees/
+
+# Codex
+tasks/todo.md
+tasks/temp.md
+
+# local temp files
+*.inventory.*
+*.completed.*
+
+# rfapps-cli
+*plan-*.json
+*plan-*.json.bak
+*plan-*.json.tmp
+*plan-*.json.tmp.bak
+
+# Terraform (state holds the tunnel secret; lock file stays committed)
+.terraform/
+*.tfstate
+*.tfstate.*
+tfplan
+
+# graphify knowledge-graph output (large, machine-local, regenerated via `graphify update .`)
+graphify-out/

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation and Troubleshooting
+    url: https://github.com/yandy-r/rfmedia-apps/tree/master/docs
+    about: Review the documentation and troubleshooting guides before opening a question issue.
+  - name: Private Security Report
+    url: https://github.com/yandy-r/rfmedia-apps/security/advisories/new
+    about: Report vulnerabilities privately through GitHub Security Advisories.

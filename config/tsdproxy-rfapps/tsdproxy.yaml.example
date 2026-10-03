@@ -1,0 +1,30 @@
+# Provider name must match tsdproxy.proxyprovider on compose labels (`rfapps`).
+# A second tsdproxy on the same Docker socket (praxrr) uses provider `praxrr`
+# and skips containers pinned to `rfapps`, which prevents git / git-1 duplicates.
+defaultProxyProvider: rfapps
+
+docker:
+  local:
+    host: unix:///var/run/docker.sock
+    targetHostname: host.docker.internal
+    tryDockerInternalNetwork: true
+    defaultProxyProvider: rfapps
+
+tailscale:
+  providers:
+    rfapps:
+      authKey: ''
+      authKeyFile: ''
+      controlUrl: https://controlplane.tailscale.com
+  dataDir: /data/
+
+http:
+  hostname: 0.0.0.0
+  port: 8080
+
+log:
+  level: info
+  json: false
+
+proxyAccessLog: true
+adminAllowLocalhost: false

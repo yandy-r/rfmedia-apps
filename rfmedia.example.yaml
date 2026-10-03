@@ -1,0 +1,328 @@
+# Example rfmedia configuration with secrets injection
+# Copy to .rfmedia.yaml and set required environment variables
+#
+# Template syntax: {{ VAR_NAME }} will be replaced with the environment variable value
+# at runtime. Missing variables will cause an error with a clear message.
+#
+# Required environment variables:
+# - PLEX_URL: Your Plex server URL (e.g., https://plex.example.com or http://localhost:32400)
+# - PLEX_TOKEN: Your Plex authentication token (X-Plex-Token)
+#
+# To get your Plex token:
+# 1. Sign into Plex Web App
+# 2. Navigate to any media item
+# 3. Click "Get Info" -> "View XML"
+# 4. Find X-Plex-Token in the URL
+
+# Copy command default options
+copy:
+  outputFolder: liked-songs
+  hardlink: false
+  force: false
+  workers: 8
+  progress: true
+  albumOnly: false
+  preserveStructure: false
+  albumMode: true
+  trackCompleted: true
+  deleteDowngraded: true
+  diskSpaceMargin: 5
+  requireDiskSpace: false
+  # range: "001-005"  # Uncomment to set a default range
+
+# Clean command default options
+clean:
+  force: false
+  minFiles: 1
+  exclude: []
+  useTrash: false
+
+# Watch command default options
+watch:
+  outputFolder: liked-songs
+  hardlink: false
+  debounceMs: 5000
+  albumOnly: false
+  preserveStructure: false
+
+# Link-videos command default options
+linkVideos:
+  minScore: 70
+  preferredFormat: mkv
+  progress: true
+
+# Global options applied to all commands
+global:
+  debug: false
+
+# ============================================================================
+# PLEX MEDIA SERVER INTEGRATION
+# Contains sensitive credentials - use template variables
+# ============================================================================
+plex:
+  # Plex server URL - use environment variable for portability
+  url: "{{ PLEX_URL }}"
+
+  # Plex authentication token (SENSITIVE - never commit actual token)
+  token: "{{ PLEX_TOKEN }}"
+
+  # Trigger library scan after copy operations
+  scanAfterCopy: true
+
+  # Scan after each source instead of at end of batch
+  scanPerSource: true
+
+  # Library path mappings for automatic library detection
+  libraries:
+    - library: Music
+      path: /data/media/music
+    # Add more libraries as needed:
+    # - library: Audiobooks
+    #   path: /data/media/audiobooks
+
+  # Default page size for Plex API queries
+  # pageSize: 100
+
+  # Default filters applied to all queries
+  # defaultFilters:
+  #   minRating: 3
+  #   excludeGenres: ["Holiday"]
+
+  # Default settings for rating sync operations
+  # syncDefaults:
+  #   prefer: plex
+  #   onlyRated: false
+
+  # Cache configuration
+  # cache:
+  #   enabled: true
+  #   ttlSeconds: 300
+
+# ============================================================================
+# LAST.FM SIMILAR-ARTIST DISCOVERY
+# Optional. Uncomment the complete section only when LASTFM_API_KEY is available.
+#
+# Config templates are expanded eagerly for every command that loads this file.
+# An unresolved LASTFM_API_KEY placeholder therefore also blocks unrelated
+# commands; template expansion is not delayed until `lidarr discover`.
+# ============================================================================
+# discovery:
+#   lastfm:
+#     # Last.fm application API key (SENSITIVE - never commit the actual key)
+#     apiKey: "{{ LASTFM_API_KEY }}"
+#     # Optional request timeout in milliseconds (default 15000, range 1-300000)
+#     timeoutMs: 15000
+
+# Lidarr music-management integration
+lidarr:
+  # Lidarr base URL
+  baseUrl: "{{ LIDARR_URL }}"
+  # Lidarr API key (SENSITIVE - never commit the actual key)
+  apiKey: "{{ LIDARR_API_KEY }}"
+  # Optional request timeout in milliseconds (default 30000)
+  # timeoutMs: 30000
+  # Optional per-lane execution overrides. Omitted values use safe defaults.
+  # scheduler:
+  #   lanes:
+  #     local-only:
+  #       concurrency: 8
+  #       operationBudget: 1000
+  #       retryAttempts: 1
+  #       retryBackoffCapMs: 15000
+  #     metadata-dependent:
+  #       concurrency: 2
+  #       operationBudget: 50
+  #       retryAttempts: 1
+  #       retryBackoffCapMs: 30000
+  #     discovery:
+  #       concurrency: 4
+  #       operationBudget: 100
+  #       retryAttempts: 2
+  #       retryBackoffCapMs: 30000
+  #     destructive:
+  #       concurrency: 1
+  #       operationBudget: 25
+  #       retryAttempts: 0
+  #       retryBackoffCapMs: 15000
+  # Optional advisory cascade analysis for newly written Lidarr mutation plans.
+  # These are illustrative operator-chosen values, not built-in or universal defaults.
+  # Every field is optional and accepts a positive integer no greater than 1000000.
+  # Omitted budgets are reported as not-configured; omitted assumptions leave
+  # dependent estimates unknown rather than treating them as zero.
+  # cascadeAnalysis:
+  #   budgets:
+  #     indexerQueries: 240
+  #     acquisitionCandidates: 80
+  #   assumptions:
+  #     albumsPerArtist: 12
+  #     indexerQueriesPerCandidate: 3
+  # Strict, local, self-contained quality preset packs.
+  # Unknown keys, built-in shadowing, inheritance, remote URLs, external files,
+  # YAML aliases, and placeholder policy are rejected.
+  profilePresets:
+    packs:
+      vinyl-archive:
+        version: 1
+        description: Prefer lossless vinyl-sourced releases for an archival music library.
+        assumptions:
+          - Lidarr exposes the Lossless quality group and its declared child qualities.
+          - Release titles use VINYL or LP when the release was sourced from vinyl.
+          - The operator accepts lossless storage and bandwidth requirements.
+        consequences:
+          - Lossy releases are excluded and lossless codecs remain eligible.
+          - Vinyl markers are a title-based preference, not proof of provenance.
+          - Existing files are not renamed and undeclared resources and scores are retained.
+        capabilities:
+          - custom-format-schema
+          - custom-format-create
+          - custom-format-update
+          - quality-profile-schema
+          - quality-profile-create
+          - quality-profile-update
+          - naming-read
+          - naming-examples
+          - naming-update
+        customFormats:
+          - name: Vinyl Source
+            includeCustomFormatWhenRenaming: false
+            specifications:
+              - name: Vinyl marker
+                implementation: ReleaseTitleSpecification
+                negate: false
+                required: true
+                fields:
+                  value: '\b(?:VINYL|LP)\b'
+        qualityProfiles:
+          - name: Vinyl Archive
+            upgradeAllowed: true
+            cutoff: Lossless
+            items:
+              - kind: group
+                name: Lossless
+                allowed: true
+                items:
+                  - kind: quality
+                    name: FLAC
+                    allowed: true
+                  - kind: quality
+                    name: ALAC
+                    allowed: true
+                  - kind: quality
+                    name: APE
+                    allowed: true
+                  - kind: quality
+                    name: WavPack
+                    allowed: true
+                  - kind: quality
+                    name: FLAC 24bit
+                    allowed: true
+                  - kind: quality
+                    name: ALAC 24bit
+                    allowed: true
+            minFormatScore: 0
+            cutoffFormatScore: 50
+            formatScores:
+              - customFormatName: Vinyl Source
+                score: 50
+        naming:
+          renameTracks: true
+          replaceIllegalCharacters: true
+          colonReplacementFormat: 4
+          standardTrackFormat: "{Album Title} ({Release Year})/{Artist Name} - {Album Title} - {track:00} - {Track Title}"
+          multiDiscTrackFormat: "{Album Title} ({Release Year})/{Medium Format} {medium:00}/{Artist Name} - {Album Title} - {track:00} - {Track Title}"
+          artistFolderFormat: "{Artist Name}"
+
+# Optional read-only Lidarr consumption policy
+policy:
+  rules:
+    stale-monitoring-cleanup:
+      # Opt in only after reviewing the policy's consumption-signal limits.
+      enabled: false
+      # Optional whole-day threshold; valid range: 1..36500.
+      minDaysSinceLastViewed: 90
+      # Both gates must pass. Set maxPlays > 0 to consider previously viewed
+      # artists whose most recent view is at least the configured age.
+      maxPlays: 10
+
+# Undo/history tracking options
+undo:
+  enabled: true
+  retentionDays: 30
+  maxSizeMB: 100
+
+# Tracking database configuration
+# tracking:
+#   database: ~/.rfmedia/tracking.db
+#   useLegacy: false
+
+# ============================================================================
+# PLEX FILTERS
+# Server-side filters for querying Plex libraries
+# ============================================================================
+plexFilters:
+  # Example: Teen Pop artists with rated tracks
+  teen-pop:
+    match: all
+    library: Music
+    type: artist
+    rules:
+      - type: rule
+        field: style
+        operator: contains
+        value: Teen Pop
+      - type: group
+        match: any
+        rules:
+          - type: rule
+            field: trackRating
+            operator: ">="
+            value: 3
+
+# ============================================================================
+# LOCAL FILTERS
+# Client-side filters for local file metadata
+# ============================================================================
+filters:
+  # Example: Filter for tracks rated 3+ stars
+  liked:
+    match: all
+    rules:
+      - type: rule
+        field: rating
+        operator: ">="
+        value: 3.0
+
+  # Example: High-quality rock tracks
+  high-quality-rock:
+    match: all
+    rules:
+      - type: rule
+        field: rating
+        operator: ">="
+        value: 3.5
+      - type: group
+        match: any
+        rules:
+          - type: rule
+            field: genre
+            operator: contains
+            value: Rock
+          - type: rule
+            field: genre
+            operator: contains
+            value: Alternative
+
+  # Example: Radio-style sequencing after filtering
+  radio-rock:
+    match: all
+    rules:
+      - type: rule
+        field: genre
+        operator: contains
+        value: Rock
+    separation:
+      artist: 5
+      genre: 3
+      tempo: alternate
+      era: distribute
+      energy: wave

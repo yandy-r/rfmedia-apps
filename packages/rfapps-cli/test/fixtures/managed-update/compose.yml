@@ -1,0 +1,6 @@
+services:
+  target:
+    image: ${MANAGED_UPDATE_TARGET_IMAGE:?MANAGED_UPDATE_TARGET_IMAGE is required}
+
+  neighbor:
+    image: ${MANAGED_UPDATE_NEIGHBOR_IMAGE:?MANAGED_UPDATE_NEIGHBOR_IMAGE is required}

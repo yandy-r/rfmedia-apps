@@ -1,0 +1,1820 @@
+# ==================================================================================================
+# Docker Compose File for rfmedia-apps
+# ==================================================================================================
+# This file is used to deploy the rfmedia-apps Docker self-hosting platform.
+# It is a Docker Compose file that defines the services and their configurations.
+# ==================================================================================================
+# Last Updated: 2026-06-17
+# Current Status: Stable
+# ==================================================================================================
+# This file is part of the rfmedia-apps Docker self-hosting platform.
+# ==================================================================================================
+
+name: rfmedia-apps
+
+# ==================================================================================================
+# Networks
+# ==================================================================================================
+networks:
+  apps:
+    name: apps
+    driver: bridge
+    ipam:
+      driver: default
+
+# ==================================================================================================
+# Volumes
+# ==================================================================================================
+volumes:
+  model-cache:
+    name: model-cache
+    driver: local
+
+# ==================================================================================================
+# Logging
+# ==================================================================================================
+x-logging-default: &logging-default
+  driver: json-file
+  options:
+    max-file: ${DOCKERLOGGING_MAXFILE}
+    max-size: ${DOCKERLOGGING_MAXSIZE}
+
+# ==================================================================================================
+# Service Base
+# ==================================================================================================
+x-service-base: &service-base
+  restart: unless-stopped
+  pull_policy: always
+
+# ==================================================================================================
+# Common Environment
+# ==================================================================================================
+x-common-env: &common-env
+  TZ: ${TZ}
+  PUID: ${PUID}
+  PGID: ${PGID}
+
+# ==================================================================================================
+# tsdproxy-rfapps labels
+# ==================================================================================================
+# Pin hosts to Tailscale provider `rfapps` so a second tsdproxy on the same Docker
+# socket (praxrr-tsdproxy) does not register duplicate machines (git / git-1).
+x-tsdproxy-rfapps: &tsdproxy-rfapps
+  tsdproxy.enable: "true"
+  tsdproxy.proxyprovider: "rfapps"
+  tsdproxy.ephemeral: "false"
+
+# ==================================================================================================
+# Services
+# ==================================================================================================
+services:
+  docktail:
+    <<: *service-base
+    container_name: docktail
+    hostname: docktail
+    networks:
+      apps: {}
+    logging: *logging-default
+    environment:
+      TAILSCALE_OAUTH_CLIENT_ID: ${TAILSCALE_OAUTH_CLIENT_ID}
+      TAILSCALE_OAUTH_CLIENT_SECRET: ${TAILSCALE_OAUTH_CLIENT_SECRET}
+      DEFAULT_SERVICE_TAGS: ${DOCKTAIL_DEFAULT_SERVICE_TAGS:-tag:container}
+      LOG_LEVEL: ${DOCKTAIL_LOG_LEVEL:-info}
+      RECONCILE_INTERVAL: ${DOCKTAIL_RECONCILE_INTERVAL:-60s}
+      DELETE_UNUSED_SERVICES: ${DOCKTAIL_DELETE_UNUSED_SERVICES:-true}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/run/tailscale:/var/run/tailscale
+    image: ghcr.io/marvinvr/docktail:latest
+
+  tsdproxy-rfapps:
+    <<: *service-base
+    container_name: tsdproxy-rfapps
+    hostname: tsdproxy-rfapps
+    networks:
+      apps: {}
+    logging: *logging-default
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ${DOCKER_DIR}/tsdproxy-rfapps/data:/data
+      - ${DOCKER_DIR}/tsdproxy-rfapps/config:/config
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    image: almeidapaulopt/tsdproxy:2
+
+  traefik:
+    <<: *service-base
+    container_name: traefik
+    hostname: traefik
+    networks:
+      apps: {}
+    logging: *logging-default
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://localhost:8080 || exit 1
+      interval: 10s
+      retries: 5
+      start_period: 20s
+      timeout: 10s
+    environment:
+      <<: *common-env
+      CF_DNS_API_TOKEN: ${CF_DNS_API_TOKEN}
+      DOMAIN: ${DOMAIN}
+      DOMAIN2: ${DOMAIN2}
+      TS_DOMAIN: ${TS_DOMAIN}
+      HOMEAUTO_SERVER: ${HOMEAUTO_SERVER}
+      NAS01_IP: ${NAS01_IP}
+      NAS02_IP: ${NAS02_IP}
+    command:
+      - --log
+      - --log.level=${LOG_LEVEL:-INFO}
+      - --log.format=json
+      - --api.insecure=true
+      - --api.dashboard=true
+      - --providers.docker
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.allowemptyservices=true
+      - --providers.file.directory=/etc/traefik/dynamic
+      - --providers.file.watch=true
+      - --serversTransport.insecureSkipVerify=true
+      - --entrypoints.web.address=:80
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --entrypoints.websecure.address=:443
+      - --entrypoints.websecure.http.tls=true
+      - --entrypoints.websecure.http.tls.certresolver=letsencrypt
+      - --entrypoints.postgres-tcp.address=:15432
+      - --entrypoints.mysql-tcp.address=:13306
+      - --certificatesresolvers.letsencrypt.acme.dnschallenge.resolvers=1.1.1.1:53,1.0.0.1:53
+      - --certificatesresolvers.letsencrypt.acme.email=${CF_API_EMAIL}
+      - --certificatesresolvers.letsencrypt.acme.storage=/etc/traefik/acme/acme.json
+      # - --certificatesresolvers.letsencrypt.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory
+      - --certificatesresolvers.letsencrypt.acme.dnschallenge.provider=cloudflare
+      - --certificatesresolvers.letsencrypt.acme.dnschallenge.delaybeforecheck=5
+    labels:
+      traefik.enable: true
+      traefik.http.routers.api.rule: Host(`traefik.${DOMAIN}`)
+      traefik.http.routers.api.service: api@internal
+      traefik.http.routers.api.entrypoints: websecure
+      traefik.http.routers.api.tls: true
+      traefik.http.routers.api.tls.certresolver: letsencrypt
+      traefik.http.routers.api.tls.domains[0].main: traefik.${DOMAIN}
+      traefik.http.services.api.loadbalancer.server.port: 8080
+      traefik.http.services.api.loadbalancer.server.scheme: http
+      traefik.http.routers.api.middlewares: authentik-dev@docker
+      docktail.service.enable: true
+      docktail.service.name: traefik
+      docktail.service.port: 443
+      docktail.service.protocol: tcp
+      docktail.service.service-port: 443
+      docktail.service.service-protocol: tcp
+      docktail.service.network: apps
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ${DOCKER_DIR}/traefik:/etc/traefik
+      - ./config/traefik:/etc/traefik/dynamic
+    image: traefik:v3
+
+  cloudflared:
+    <<: *service-base
+    container_name: cloudflared
+    hostname: cloudflared
+    user: "${PUID}:${PGID}"
+    networks:
+      apps: {}
+    logging: *logging-default
+    # Remotely-managed tunnel: ingress + DNS live in infra/terraform/cloudflare (npm run tf:plan:apply cloudflare).
+    command: tunnel --no-autoupdate --metrics 0.0.0.0:2000 run
+    environment:
+      <<: *common-env
+      TUNNEL_TOKEN: ${CF_TUNNEL_TOKEN}
+    healthcheck:
+      test: ["CMD", "cloudflared", "tunnel", "--metrics", "localhost:2000", "ready"]
+      interval: 20s
+      retries: 5
+      start_period: 30s
+      timeout: 10s
+    image: cloudflare/cloudflared:latest
+
+  authentik-server:
+    <<: *service-base
+    container_name: authentik-server
+    hostname: authentik-server
+    networks:
+      apps: {}
+    command: server
+    logging: *logging-default
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python3",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:9000/-/health/ready/')",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    environment:
+      <<: *common-env
+      AUTHENTIK_REDIS__HOST: authentik-redis
+      AUTHENTIK_POSTGRESQL__HOST: authentik-db
+      AUTHENTIK_POSTGRESQL__USER: ${PG_USER:-authentik}
+      AUTHENTIK_POSTGRESQL__NAME: ${PG_DB:-authentik}
+      AUTHENTIK_ERROR_REPORTING__ENABLED: true
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${AUTHENTIK_POSTGRES_PASSWORD}
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY}
+      AUTHENTIK_EMAIL__HOST: ${AUTHENTIK_EMAIL_HOST}
+      AUTHENTIK_EMAIL__PORT: ${AUTHENTIK_EMAIL_PORT}
+      AUTHENTIK_EMAIL__USERNAME: ${AUTHENTIK_EMAIL_USERNAME}
+      AUTHENTIK_EMAIL__PASSWORD: ${AUTHENTIK_EMAIL_PASSWORD}
+      AUTHENTIK_EMAIL__USE_TLS: ${AUTHENTIK_EMAIL_USE_TLS:-true}
+      AUTHENTIK_EMAIL__USE_SSL: ${AUTHENTIK_EMAIL_USE_SSL:-false}
+      AUTHENTIK_EMAIL__TIMEOUT: ${AUTHENTIK_EMAIL_TIMEOUT:-10}
+      AUTHENTIK_EMAIL__FROM: ${AUTHENTIK_EMAIL_FROM}
+      AUTHENTIK_STORAGE__MEDIA__BACKEND: ${AUTHENTIK_STORAGE__MEDIA__BACKEND:-file}
+      AUTHENTIK_STORAGE__MEDIA__S3__BUCKET_NAME: ${AUTHENTIK_STORAGE__MEDIA__S3__BUCKET_NAME:-""}
+      AUTHENTIK_STORAGE__MEDIA__S3__ACCESS_KEY: ${AUTHENTIK_STORAGE__MEDIA__S3__ACCESS_KEY:-""}
+      AUTHENTIK_STORAGE__MEDIA__S3__SECRET_KEY: ${AUTHENTIK_STORAGE__MEDIA__S3__SECRET_KEY:-""}
+      AUTHENTIK_STORAGE__MEDIA__S3__REGION: ${AUTHENTIK_STORAGE__MEDIA__S3__REGION:-"us-east-1"}
+      AUTHENTIK_LISTEN__HTTP: 0.0.0.0:9000 # derfault only here for reference
+      AUTHENTIK_LISTEN__HTTPS: 0.0.0.0:9443 # derfault only here for reference
+    labels:
+      traefik.enable: true
+      traefik.http.routers.authentik-dev.rule: Host(`authentik.${DOMAIN}`) || (Host(`authentik.${DOMAIN}`) && Path(`/outpost.goauthentik.io/`))
+      traefik.http.routers.authentik-dev.entrypoints: websecure
+      traefik.http.routers.authentik-dev.tls: true
+      traefik.http.routers.authentik-dev.tls.certresolver: letsencrypt
+      traefik.http.routers.authentik-dev.tls.domains[0].main: authentik.${DOMAIN}
+      traefik.http.routers.authentik-dev.service: authentik-dev
+      traefik.http.services.authentik-dev.loadbalancer.server.port: 9443
+      traefik.http.services.authentik-dev.loadbalancer.server.scheme: https
+      traefik.http.middlewares.authentik-dev.forwardauth.address: https://authentik-server:9443/outpost.goauthentik.io/auth/traefik
+      traefik.http.middlewares.authentik-dev.forwardauth.tls.insecureSkipVerify: true
+      traefik.http.middlewares.authentik-dev.forwardauth.trustForwardHeader: true
+      traefik.http.middlewares.authentik-dev.forwardauth.maxResponseBodySize: "1048576"
+      traefik.http.middlewares.authentik-dev.forwardauth.authResponseHeaders: X-authentik-username,X-authentik-groups,X-authentik-entitlements,X-authentik-email,X-authentik-name,X-authentik-uid,X-authentik-jwt,X-authentik-meta-jwks,X-authentik-meta-outpost,X-authentik-meta-provider,X-authentik-meta-app,X-authentik-meta-version
+      traefik.http.routers.authentik-media.rule: Host(`authentik.${DOMAIN2}`) || (Host(`authentik.${DOMAIN2}`) && Path(`/outpost.goauthentik.io/`))
+      traefik.http.routers.authentik-media.entrypoints: websecure
+      traefik.http.routers.authentik-media.tls: true
+      traefik.http.routers.authentik-media.tls.certresolver: letsencrypt
+      traefik.http.routers.authentik-media.tls.domains[0].main: authentik.${DOMAIN2}
+      traefik.http.routers.authentik-media.service: authentik-media
+      traefik.http.services.authentik-media.loadbalancer.server.port: 9443
+      traefik.http.services.authentik-media.loadbalancer.server.scheme: https
+      traefik.http.middlewares.authentik-media.forwardauth.address: https://authentik-media:9443/outpost.goauthentik.io/auth/traefik
+      traefik.http.middlewares.authentik-media.forwardauth.tls.insecureSkipVerify: true
+      traefik.http.middlewares.authentik-media.forwardauth.trustForwardHeader: true
+      traefik.http.middlewares.authentik-media.forwardauth.maxResponseBodySize: "1048576"
+      traefik.http.middlewares.authentik-media.forwardauth.authResponseHeaders: X-authentik-username,X-authentik-groups,X-authentik-entitlements,X-authentik-email,X-authentik-name,X-authentik-uid,X-authentik-jwt,X-authentik-meta-jwks,X-authentik-meta-outpost,X-authentik-meta-provider,X-authentik-meta-app,X-authentik-meta-version
+    volumes:
+      - ${DOCKER_DIR}/authentik-server/data:/data
+      - ${DOCKER_DIR}/authentik-server/custom-templates:/templates
+      - ${DOCKER_DIR}/letsencrypt/certs/live:/certs
+    depends_on:
+      - authentik-db
+      - authentik-redis
+    image: ${AUTHENTIK_IMAGE:-ghcr.io/goauthentik/server}:${AUTHENTIK_TAG:-2025.12}
+
+  authentik-worker:
+    <<: *service-base
+    container_name: authentik-worker
+    hostname: authentik-worker
+    networks:
+      apps: {}
+    command: worker
+    logging: *logging-default
+    healthcheck:
+      test: ["CMD-SHELL", "tr '\\000' ' ' </proc/1/cmdline | grep -Eq 'worker|celery'"]
+      interval: 20s
+      retries: 5
+      start_period: 40s
+      timeout: 5s
+    environment:
+      <<: *common-env
+      AUTHENTIK_REDIS__HOST: authentik-redis
+      AUTHENTIK_POSTGRESQL__HOST: authentik-db
+      AUTHENTIK_POSTGRESQL__USER: ${PG_USER:-authentik}
+      AUTHENTIK_POSTGRESQL__NAME: ${PG_DB:-authentik}
+      AUTHENTIK_ERROR_REPORTING__ENABLED: true
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${AUTHENTIK_POSTGRES_PASSWORD}
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_POSTGRES_PASSWORD}
+    volumes:
+      - ${DOCKER_DIR}/authentik-server/data:/data
+      - ${DOCKER_DIR}/authentik-server/custom-templates:/templates
+      - ${DOCKER_DIR}/letsencrypt/certs:/certs
+    depends_on:
+      authentik-server:
+        condition: service_healthy
+      authentik-db:
+        condition: service_started
+      authentik-redis:
+        condition: service_started
+    image: ${AUTHENTIK_IMAGE:-ghcr.io/goauthentik/server}:${AUTHENTIK_TAG:-2025.12}
+
+  authentik-db:
+    <<: *service-base
+    container_name: authentik-db
+    networks:
+      apps: {}
+    logging: *logging-default
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      start_period: 20s
+      interval: 30s
+      retries: 5
+      timeout: 5s
+    environment:
+      POSTGRES_USER: ${PG_USER:-authentik}
+      POSTGRES_PASSWORD: ${AUTHENTIK_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${PG_DB:-authentik}
+    labels:
+      traefik.enable: true
+      traefik.tcp.routers.authentik-db.rule: HostSNI(`authentik-db.${DOMAIN}`)
+      traefik.tcp.routers.authentik-db.entrypoints: postgres-tcp
+      traefik.tcp.routers.authentik-db.tls: true
+      traefik.tcp.routers.authentik-db.tls.certresolver: letsencrypt
+      traefik.tcp.routers.authentik-db.tls.domains[0].main: authentik-db.${DOMAIN}
+      traefik.tcp.routers.authentik-db.service: authentik-db
+      traefik.tcp.services.authentik-db.loadbalancer.server.port: 5432
+    volumes:
+      - ${DOCKER_DATA_DIR}/authentik-db:/var/lib/postgresql/data
+    image: docker.io/library/postgres:16-alpine
+
+  authentik-redis:
+    <<: *service-base
+    container_name: authentik-redis
+    networks:
+      apps: {}
+    command: --save 60 1 --loglevel warning
+    logging: *logging-default
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      start_period: 20s
+      interval: 30s
+      retries: 5
+      timeout: 3s
+    volumes:
+      - ${DOCKER_DATA_DIR}/authentik-redis:/data
+    image: docker.io/library/redis:alpine
+
+  authentik-media:
+    <<: *service-base
+    container_name: authentik-media
+    networks:
+      apps: {}
+    logging: *logging-default
+    healthcheck:
+      test: ["CMD-SHELL", "tr '\\000' ' ' </proc/1/cmdline | grep -Eq 'proxy|outpost|authentik'"]
+      interval: 20s
+      retries: 5
+      start_period: 40s
+      timeout: 5s
+    environment:
+      <<: *common-env
+      AUTHENTIK_HOST: https://authentik-server:9443
+      AUTHENTIK_INSECURE: true
+      AUTHENTIK_TOKEN: ${AUTHENTIK_TOKEN}
+      AUTHENTIK_HOST_BROWSER: ${AUTHENTIK_HOST_BROWSER}
+    depends_on:
+      authentik-server:
+        condition: service_healthy
+      authentik-db:
+        condition: service_started
+      authentik-redis:
+        condition: service_started
+    image: ghcr.io/goauthentik/proxy:${AUTHENTIK_TAG:-2025.10}
+
+  uptime-kuma:
+    <<: *service-base
+    container_name: uptime-kuma
+    hostname: uptime-kuma
+    networks:
+      apps: {}
+    logging: *logging-default
+    healthcheck:
+      test: curl --fail http://localhost:3001 || exit 1
+      interval: 10s
+      retries: 5
+      start_period: 20s
+      timeout: 10s
+    environment:
+      <<: *common-env
+    labels:
+      traefik.enable: true
+      traefik.http.routers.uptime-kuma.rule: Host(`uptime.${DOMAIN}`)
+      traefik.http.routers.uptime-kuma.entrypoints: websecure
+      traefik.http.routers.uptime-kuma.tls: true
+      traefik.http.routers.uptime-kuma.tls.certresolver: letsencrypt
+      traefik.http.routers.uptime-kuma.tls.domains[0].main: uptime.${DOMAIN}
+      traefik.http.routers.uptime-kuma.middlewares: authentik-dev@docker
+      traefik.http.services.uptime-kuma.loadbalancer.server.port: 3001
+      traefik.http.services.uptime-kuma.loadbalancer.server.scheme: http
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ${DOCKER_DIR}/uptime-kuma:/app/data
+    image: louislam/uptime-kuma:2
+
+  tokenhop:
+    <<: *service-base
+    container_name: tokenhop
+    hostname: tokenhop
+    init: true
+    read_only: true
+    # The upstream entrypoint repairs data ownership, then drops to the node user.
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources: { limits: { cpus: "2.0", memory: 1G, pids: 256 } }
+    networks:
+      apps: {}
+    logging: *logging-default
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:20128/api/health"]
+      interval: 20s
+      retries: 5
+      start_period: 30s
+      timeout: 5s
+    environment:
+      DATA_DIR: /app/data
+      PORT: 20128
+      HOSTNAME: 0.0.0.0
+      NODE_ENV: production
+      JWT_SECRET: ${TOKENHOP_JWT_SECRET}
+      INITIAL_PASSWORD: ${TOKENHOP_INITIAL_PASSWORD}
+      API_KEY_SECRET: ${TOKENHOP_API_KEY_SECRET}
+      MACHINE_ID_SALT: ${TOKENHOP_MACHINE_ID_SALT}
+      AUTH_COOKIE_SECURE: ${TOKENHOP_AUTH_COOKIE_SECURE:-true}
+      ENABLE_REQUEST_LOGS: ${TOKENHOP_ENABLE_REQUEST_LOGS:-false}
+      BASE_URL: https://tokenhop.${DOMAIN}
+      NEXT_PUBLIC_BASE_URL: https://tokenhop.${DOMAIN}
+      # Upstream cloud endpoint still read by the app; unchanged by the rebrand.
+      CLOUD_URL: https://9router.com
+      NEXT_PUBLIC_CLOUD_URL: https://9router.com
+      HEADROOM_URL: ${TOKENHOP_HEADROOM_URL:-http://headroom:8787}
+      CLAUDE_CLI_VERSION: 2.1.280
+      CLAUDE_CLI_SDK_VERSION: 0.112.1
+      CLAUDE_CLI_RUNTIME_VERSION: v26.3.0
+      GROK_CLI_VERSION: 1.0.44
+      CODEX_CLI_VERSION: 0.159.3
+      ANTIGRAVITY_OAUTH_CLIENT_ID: ${ANTIGRAVITY_OAUTH_CLIENT_ID}
+      ANTIGRAVITY_OAUTH_CLIENT_SECRET: ${ANTIGRAVITY_OAUTH_CLIENT_SECRET}
+      GEMINI_OAUTH_CLIENT_ID: ${GEMINI_OAUTH_CLIENT_ID}
+      GEMINI_OAUTH_CLIENT_SECRET: ${GEMINI_OAUTH_CLIENT_SECRET}
+    depends_on:
+      headroom:
+        condition: service_healthy
+    labels:
+      traefik.enable: true
+      traefik.http.routers.tokenhop.rule: Host(`tokenhop.${DOMAIN}`)
+      traefik.http.routers.tokenhop.entrypoints: websecure
+      traefik.http.routers.tokenhop.tls: true
+      traefik.http.routers.tokenhop.tls.certresolver: letsencrypt
+      traefik.http.routers.tokenhop.tls.domains[0].main: tokenhop.${DOMAIN}
+      # OpenAI-compatible API: programmatic clients can't do Authentik's browser flow; native API keys guard /v1.
+      # Longer rule = higher Traefik priority than the dashboard router above.
+      traefik.http.routers.tokenhop-api.rule: Host(`tokenhop.${DOMAIN}`) && PathPrefix(`/v1`)
+      traefik.http.routers.tokenhop-api.entrypoints: websecure
+      traefik.http.routers.tokenhop-api.tls: true
+      traefik.http.routers.tokenhop-api.tls.certresolver: letsencrypt
+      traefik.http.services.tokenhop.loadbalancer.server.port: 20128
+      traefik.http.services.tokenhop.loadbalancer.server.scheme: http
+      <<: *tsdproxy-rfapps
+      tsdproxy.name: "tokenhop"
+      tsdproxy.dash.label: "tokenhop"
+      tsdproxy.port.1: "443/https:20128/http"
+    tmpfs:
+      - /tmp:size=64m,noexec,nosuid,nodev
+    volumes:
+      - ${DOCKER_DIR}/tokenhop:/app/data
+    image: ${TOKENHOP_IMAGE:-ghcr.io/tokenhop/tokenhop}:${TOKENHOP_TAG:-latest}
+
+  headroom:
+    <<: *service-base
+    container_name: headroom
+    hostname: headroom
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources: { limits: { cpus: "2.0", memory: 2G, pids: 256 } }
+    networks:
+      apps: {}
+    logging: *logging-default
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8787/readyz"]
+      interval: 20s
+      retries: 5
+      start_period: 30s
+      timeout: 5s
+    environment:
+      HEADROOM_HOST: 0.0.0.0
+      HEADROOM_PORT: 8787
+      HEADROOM_COMPRESS_ALLOW_REMOTE: "1"
+      HEADROOM_MODE: ${HEADROOM_MODE:-cache}
+      HEADROOM_SAVINGS_PROFILE: ${HEADROOM_SAVINGS_PROFILE:-coding}
+      HEADROOM_BEACON: ${HEADROOM_BEACON:-off}
+      HEADROOM_TELEMETRY: ${HEADROOM_TELEMETRY:-off}
+    labels:
+      traefik.enable: true
+      traefik.http.routers.headroom.rule: Host(`headroom.${DOMAIN}`)
+      traefik.http.routers.headroom.entrypoints: websecure
+      traefik.http.routers.headroom.tls: true
+      traefik.http.routers.headroom.tls.certresolver: letsencrypt
+      traefik.http.routers.headroom.tls.domains[0].main: headroom.${DOMAIN}
+      traefik.http.services.headroom.loadbalancer.server.port: 8787
+      traefik.http.services.headroom.loadbalancer.server.scheme: http
+      <<: *tsdproxy-rfapps
+      tsdproxy.name: "headroom"
+      tsdproxy.dash.label: "Headroom"
+      tsdproxy.port.1: "443/https:8787/http"
+    expose:
+      - 8787
+    volumes:
+      - ${DOCKER_DIR}/headroom:/home/nonroot/.headroom
+    image: ${HEADROOM_IMAGE:-ghcr.io/headroomlabs-ai/headroom}:${HEADROOM_TAG:-0.37.0}@${HEADROOM_DIGEST:-sha256:4e559273659ebc5ce8711a60278e288550fa596377af18a7058e10036d63ef0b}
+
+  forgejo-postgres:
+    <<: *service-base
+    container_name: forgejo-postgres
+    hostname: forgejo-postgres
+    networks:
+      apps: {}
+    logging: *logging-default
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      start_period: 20s
+      interval: 30s
+      retries: 5
+      timeout: 5s
+    environment:
+      POSTGRES_USER: ${FORGEJO_DB_USER:-forgejo}
+      POSTGRES_PASSWORD: ${FORGEJO_DB_PASSWORD}
+      POSTGRES_DB: ${FORGEJO_DB_NAME:-forgejo}
+    volumes:
+      - ${DOCKER_DATA_DIR}/forgejo-postgres:/var/lib/postgresql/data
+    image: docker.io/library/postgres:16-alpine
+
+  forgejo:
+    <<: *service-base
+    container_name: forgejo
+    hostname: forgejo
+    networks:
+      apps: {}
+    user: "${PUID}:${PGID}"
+    logging: *logging-default
+    healthcheck:
+      test: curl --fail --silent --show-error http://localhost:3000/api/healthz || curl --fail --silent --show-error http://localhost:3000 || exit 1
+      interval: 15s
+      retries: 8
+      start_period: 60s
+      timeout: 10s
+    environment:
+      <<: *common-env
+      USER_UID: ${PUID}
+      USER_GID: ${PGID}
+      FORGEJO__database__DB_TYPE: postgres
+      FORGEJO__database__HOST: forgejo-postgres
+      FORGEJO__database__PORT: 5432
+      FORGEJO__database__NAME: ${FORGEJO_DB_NAME:-forgejo}
+      FORGEJO__database__USER: ${FORGEJO_DB_USER:-forgejo}
+      FORGEJO__database__PASSWD: ${FORGEJO_DB_PASSWORD}
+      FORGEJO__server__DOMAIN: git.${DOMAIN}
+      FORGEJO__server__ROOT_URL: https://git.${TS_DOMAIN}/
+      FORGEJO__server__SSH_DOMAIN: git.${TS_DOMAIN}
+      FORGEJO__server__SSH_PORT: 22
+      FORGEJO__actions__ENABLED: true
+      FORGEJO__actions__DEFAULT_ACTIONS_URL: https://data.forgejo.org
+    labels:
+      traefik.enable: true
+      traefik.http.routers.forgejo.rule: Host(`git.${DOMAIN}`) || Host(`forgejo.${DOMAIN}`)
+      traefik.http.routers.forgejo.entrypoints: websecure
+      traefik.http.routers.forgejo.tls: true
+      traefik.http.routers.forgejo.tls.certresolver: letsencrypt
+      traefik.http.routers.forgejo.tls.domains[0].main: git.${DOMAIN}
+      traefik.http.routers.forgejo.tls.domains[1].main: forgejo.${DOMAIN}
+      traefik.http.services.forgejo.loadbalancer.server.port: 3000
+      traefik.http.services.forgejo.loadbalancer.server.scheme: http
+      <<: *tsdproxy-rfapps
+      tsdproxy.name: "git"
+      tsdproxy.dash.label: "Forgejo"
+      tsdproxy.port.1: "443/https:3000/http"
+      tsdproxy.port.2: "22/tcp:2222/tcp"
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ${DOCKER_DIR}/forgejo:/var/lib/gitea
+    depends_on:
+      forgejo-postgres:
+        condition: service_healthy
+    image: codeberg.org/forgejo/forgejo:15-rootless
+
+  forgejo-runner:
+    <<: *service-base
+    container_name: forgejo-runner
+    hostname: forgejo-runner
+    user: "${PUID}:${PGID}"
+    group_add:
+      - 988
+    networks:
+      apps: {}
+    logging: *logging-default
+    environment:
+      <<: *common-env
+    volumes:
+      - ${DOCKER_DIR}/forgejo-runner:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      forgejo:
+        condition: service_healthy
+    command:
+      - forgejo-runner
+      - daemon
+      - --config
+      - /data/runner-config.yml
+    image: data.forgejo.org/forgejo/runner:12
+
+  forgejo-runner-2:
+    <<: *service-base
+    container_name: forgejo-runner-2
+    hostname: forgejo-runner-2
+    user: "${PUID}:${PGID}"
+    group_add:
+      - 988
+    networks:
+      apps: {}
+    logging: *logging-default
+    environment:
+      <<: *common-env
+    volumes:
+      - ${DOCKER_DIR}/forgejo-runner-2:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      forgejo:
+        condition: service_healthy
+    command:
+      - forgejo-runner
+      - daemon
+      - --config
+      - /data/runner-config.yml
+    image: data.forgejo.org/forgejo/runner:12
+
+  forgejo-runner-3:
+    <<: *service-base
+    container_name: forgejo-runner-3
+    hostname: forgejo-runner-3
+    user: "${PUID}:${PGID}"
+    group_add:
+      - 988
+    networks:
+      apps: {}
+    logging: *logging-default
+    environment:
+      <<: *common-env
+    volumes:
+      - ${DOCKER_DIR}/forgejo-runner-3:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      forgejo:
+        condition: service_healthy
+    command:
+      - forgejo-runner
+      - daemon
+      - --config
+      - /data/runner-config.yml
+    image: data.forgejo.org/forgejo/runner:12
+
+  forgejo-itcn-runner:
+    <<: *service-base
+    container_name: forgejo-itcn-runner
+    hostname: forgejo-itcn-runner
+    user: "${PUID}:${PGID}"
+    group_add:
+      - 988
+    networks:
+      apps: {}
+    logging: *logging-default
+    environment:
+      <<: *common-env
+    volumes:
+      - ${DOCKER_DIR}/forgejo-itcn-runner:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      forgejo:
+        condition: service_healthy
+    command:
+      - forgejo-runner
+      - daemon
+      - --config
+      - /data/runner-config.yml
+    image: data.forgejo.org/forgejo/runner:12
+
+  # itcn runner 2
+  forgejo-itcn-runner-2:
+    <<: *service-base
+    container_name: forgejo-itcn-runner-2
+    hostname: forgejo-itcn-runner-2
+    user: "${PUID}:${PGID}"
+    group_add:
+      - 988
+    networks:
+      apps: {}
+    logging: *logging-default
+    environment:
+      <<: *common-env
+    volumes:
+      - ${DOCKER_DIR}/forgejo-itcn-runner-2:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      forgejo:
+        condition: service_healthy
+    command:
+      - forgejo-runner
+      - daemon
+      - --config
+      - /data/runner-config.yml
+    image: data.forgejo.org/forgejo/runner:12
+
+  # itcn runner 3
+  forgejo-itcn-runner-3:
+    <<: *service-base
+    container_name: forgejo-itcn-runner-3
+    hostname: forgejo-itcn-runner-3
+    user: "${PUID}:${PGID}"
+    group_add:
+      - 988
+    networks:
+      apps: {}
+    logging: *logging-default
+    environment:
+      <<: *common-env
+    volumes:
+      - ${DOCKER_DIR}/forgejo-itcn-runner-3:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      forgejo:
+        condition: service_healthy
+    command:
+      - forgejo-runner
+      - daemon
+      - --config
+      - /data/runner-config.yml
+    image: data.forgejo.org/forgejo/runner:12
+
+  speedtest-tracker:
+    container_name: speedtest-tracker
+    hostname: speedtest
+    restart: unless-stopped
+    networks:
+      apps: {}
+    logging: *logging-default
+    healthcheck:
+      test: curl --fail --silent --show-error -k https://localhost:443/api/healthcheck || exit 1
+      interval: 20s
+      retries: 5
+      start_period: 30s
+      timeout: 5s
+    environment:
+      <<: *common-env
+      APP_KEY: ${SPEEDTEST_APP_KEY}
+      DB_CONNECTION: sqlite
+      SPEEDTEST_SCHEDULER:
+      SPEEDTEST_SERVERS:
+    labels:
+      traefik.enable: true
+      traefik.http.routers.speedtest-tracker.rule: Host(`speedtest.${DOMAIN}`)
+      traefik.http.routers.speedtest-tracker.entrypoints: websecure
+      traefik.http.routers.speedtest-tracker.tls: true
+      traefik.http.routers.speedtest-tracker.tls.certresolver: letsencrypt
+      traefik.http.routers.speedtest-tracker.tls.domains[0].main: speedtest.${DOMAIN}
+      traefik.http.routers.speedtest-tracker.middlewares: authentik-dev@docker
+      traefik.http.services.speedtest-tracker.loadbalancer.server.port: 443
+      traefik.http.services.speedtest-tracker.loadbalancer.server.scheme: https
+    volumes:
+      - ${DOCKER_DIR}/speedtest-tracker:/config
+    image: lscr.io/linuxserver/speedtest-tracker:latest
+
+  stirling-pdf:
+    <<: *service-base
+    container_name: stirling-pdf
+    hostname: stirling-pdf
+    networks:
+      apps: {}
+    logging: *logging-default
+    healthcheck:
+      test: curl --fail --silent http://localhost:8080/api/v1/info/status || exit 1
+      interval: 10s
+      retries: 5
+      start_period: 40s
+      timeout: 10s
+    environment:
+      <<: *common-env
+      DISABLE_ADDITIONAL_FEATURES: false
+      SECURITY_ENABLELOGIN: true
+    labels:
+      traefik.enable: true
+      traefik.http.routers.stirling-pdf.rule: Host(`pdf.${DOMAIN2}`)
+      traefik.http.routers.stirling-pdf.entrypoints: websecure
+      traefik.http.routers.stirling-pdf.tls: true
+      traefik.http.routers.stirling-pdf.tls.certresolver: letsencrypt
+      traefik.http.routers.stirling-pdf.tls.domains[0].main: pdf.${DOMAIN2}
+      traefik.http.routers.stirling-pdf.middlewares: authentik-media@docker
+      traefik.http.services.stirling-pdf.loadbalancer.server.port: 8080
+      traefik.http.services.stirling-pdf.loadbalancer.server.scheme: http
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ${DOCKER_DIR}/stirling-pdf/trainingData:/usr/share/tessdata
+      - ${DOCKER_DIR}/stirling-pdf/extraConfigs:/configs
+      - ${DOCKER_DIR}/stirling-pdf/customFiles:/customFiles
+      - ${DOCKER_DIR}/stirling-pdf/logs:/logs
+      - ${DOCKER_DIR}/stirling-pdf/pipeline:/pipeline
+    image: docker.stirlingpdf.com/stirlingtools/stirling-pdf:latest
+
+  homarr:
+    <<: *service-base
+    container_name: homarr
+    networks:
+      apps: {}
+    logging: *logging-default
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://localhost:7575/api/health/live || exit 1
+      interval: 20s
+      retries: 5
+      start_period: 30s
+      timeout: 5s
+    environment:
+      <<: *common-env
+      SECRET_ENCRYPTION_KEY: ${HOMARR_SECRET_KEY}
+    labels:
+      traefik.enable: true
+      traefik.http.routers.homarr.rule: Host(`homarr.${DOMAIN2}`)
+      traefik.http.routers.homarr.entrypoints: websecure
+      traefik.http.routers.homarr.tls: true
+      traefik.http.routers.homarr.tls.certresolver: letsencrypt
+      traefik.http.routers.homarr.tls.domains[0].main: homarr.${DOMAIN2}
+      traefik.http.services.homarr.loadbalancer.server.port: 7575
+      traefik.http.services.homarr.loadbalancer.server.scheme: http
+      traefik.http.routers.homarr.middlewares: authentik-media@docker
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ${DOCKER_DIR}/homarr:/appdata
+    image: ghcr.io/homarr-labs/homarr:latest
+
+  sabnzbd:
+    <<: *service-base
+    container_name: sabnzbd
+    hostname: sabnzbd
+    networks:
+      apps: {}
+    logging: *logging-default
+    # Dedicated API probes require auth/API key wiring; retain root fallback for readiness stability.
+    healthcheck:
+      test: curl --fail --silent --show-error http://localhost:8080 || exit 1
+      interval: 15s
+      retries: 8
+      start_period: 45s
+      timeout: 5s
+    environment:
+      <<: *common-env
+      DOCKER_MODS: ghcr.io/themepark-dev/theme.park:sabnzbd
+      TP_THEME: ${TP_THEME}
+    labels:
+      traefik.enable: true
+      traefik.http.routers.sabnzbd.rule: Host(`sabnzbd.${DOMAIN2}`)
+      traefik.http.routers.sabnzbd.entrypoints: websecure
+      traefik.http.routers.sabnzbd.tls: true
+      traefik.http.routers.sabnzbd.tls.certresolver: letsencrypt
+      traefik.http.routers.sabnzbd.tls.domains[0].main: sabnzbd.${DOMAIN2}
+      traefik.http.services.sabnzbd.loadbalancer.server.port: 8080
+      traefik.http.services.sabnzbd.loadbalancer.server.scheme: http
+      traefik.http.routers.sabnzbd.middlewares: authentik-media@docker
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ${DOCKER_DIR}/sabnzbd:/config
+      - ${DATA_DIR}/usenet:/data/usenet:rw
+    image: lscr.io/linuxserver/sabnzbd:unstable
+    # image: ghcr.io/hotio/sabnzbd:latest
+
+  nzbget:
+    <<: *service-base
+    container_name: nzbget
+    hostname: nzbget
+    networks:
+      apps: {}
+    logging: *logging-default
+    # Dedicated JSON-RPC checks are credential-coupled; retain root fallback.
+    healthcheck:
+      test: curl --fail --silent --show-error http://localhost:6789 || exit 1
+      interval: 15s
+      retries: 8
+      start_period: 45s
+      timeout: 5s
+    environment:
+      <<: *common-env
+      NZBGET_USER: ${NZBGET_USER}
+      NZBGET_PASS: ${NZBGET_PASS}
+      DOCKER_MODS: ghcr.io/themepark-dev/theme.park:nzbget
+      TP_THEME: ${TP_THEME}
+    labels:
+      traefik.enable: true
+      traefik.http.routers.nzbget.rule: Host(`nzbget.${DOMAIN2}`)
+      traefik.http.routers.nzbget.entrypoints: websecure
+      traefik.http.routers.nzbget.tls: true
+      traefik.http.routers.nzbget.tls.certresolver: letsencrypt
+      traefik.http.routers.nzbget.tls.domains[0].main: nzbget.${DOMAIN2}
+      traefik.http.services.nzbget.loadbalancer.server.port: 6789
+      traefik.http.services.nzbget.loadbalancer.server.scheme: http
+      traefik.http.routers.nzbget.middlewares: authentik-media@docker
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ${DOCKER_DIR}/nzbget:/config
+      - ${DATA_DIR}/usenet:/data/usenet:rw
+    image: lscr.io/linuxserver/nzbget:latest
+    # image: ghcr.io/hotio/nzbget:latest
+
+  slskd:
+    <<: *service-base
+    container_name: slskd
+    hostname: slskd
+    networks:
+      apps: {}
+    logging: *logging-default
+    cap_add:
+      - NET_ADMIN
+    sysctls:
+      - net.ipv4.conf.all.src_valid_mark=1
+      - net.ipv6.conf.all.disable_ipv6=1
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    healthcheck:
+      test: curl --fail --silent --show-error http://localhost:5030/health || exit 1
+      interval: 15s
+      retries: 8
+      start_period: 45s
+      timeout: 5s
+    environment:
+      <<: *common-env
+      VPN_ENABLED: true
+      VPN_CONF: wg0
+      VPN_PROVIDER: proton
+      VPN_AUTO_PORT_FORWARD: true
+      VPN_HEALTHCHECK_ENABLED: true
+      VPN_LAN_NETWORK: ${VPN_LAN_NETWORK}
+      PRIVOXY_ENABLED: false
+      SLSKD_REMOTE_CONFIGURATION: "true"
+      SLSKD_USERNAME: slskd
+      SLSKD_PASSWORD: ${SLSKD_PASSWORD}
+      SLSKD_DOWNLOADS_DIR: /data/downloads/slskd/complete
+      SLSKD_INCOMPLETE_DIR: /data/downloads/slskd/incomplete
+      SLSKD_SHARED_DIR: /data/media/music
+      SLSKD_SLSK_USERNAME: ${SLSKD_SLSK_USERNAME}
+      SLSKD_SLSK_PASSWORD: ${SLSKD_SLSK_PASSWORD}
+      SLSKD_API_KEY: ${SLSKD_API_KEY}
+      SLSKD_JWT_KEY: ${SLSKD_JWT_KEY}
+      SLSKD_SLSK_LISTEN_PORT: "50300"
+    labels:
+      traefik.enable: true
+      traefik.http.routers.slskd.rule: Host(`soulseek.${DOMAIN2}`) || Host(`slskd.${DOMAIN2}`)
+      traefik.http.routers.slskd.entrypoints: websecure
+      traefik.http.routers.slskd.tls: true
+      traefik.http.routers.slskd.tls.certresolver: letsencrypt
+      traefik.http.routers.slskd.tls.domains[0].main: slskd.${DOMAIN2}
+      traefik.http.routers.slskd.tls.domains[1].main: soulseek.${DOMAIN2}
+      traefik.http.services.slskd.loadbalancer.server.port: 5030
+      traefik.http.services.slskd.loadbalancer.server.scheme: http
+      traefik.http.routers.slskd.middlewares: authentik-media@docker
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ${DOCKER_DIR}/slskd:/config
+      - ${DATA_DIR}:/data:rw
+    image: ghcr.io/hotio/slskd:release
+
+  prowlarr:
+    <<: *service-base
+    container_name: prowlarr
+    hostname: prowlarr
+    networks:
+      apps: {}
+    logging: *logging-default
+    healthcheck:
+      test: curl --fail --silent --show-error http://localhost:9696/ping || exit 1
+      interval: 15s
+      retries: 8
+      start_period: 45s
+      timeout: 5s
+    environment:
+      <<: *common-env
+      DOCKER_MODS: ghcr.io/themepark-dev/theme.park:prowlarr
+      TP_THEME: ${TP_THEME}
+      TP_ADDON: prowlarr-text-logo
+    labels:
+      traefik.enable: true
+      traefik.http.routers.prowlarr.rule: Host(`prowlarr.${DOMAIN2}`)
+      traefik.http.routers.prowlarr.entrypoints: websecure
+      traefik.http.routers.prowlarr.tls: true
+      traefik.http.routers.prowlarr.tls.certresolver: letsencrypt
+      traefik.http.routers.prowlarr.tls.domains[0].main: prowlarr.${DOMAIN2}
+      traefik.http.services.prowlarr.loadbalancer.server.port: 9696
+      traefik.http.services.prowlarr.loadbalancer.server.scheme: http
+      traefik.http.routers.prowlarr.middlewares: authentik-media@docker
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ${DOCKER_DIR}/prowlarr:/config
+    depends_on:
+      sabnzbd:
+        condition: service_healthy
+      nzbget:
+        condition: service_healthy
+    image: lscr.io/linuxserver/prowlarr:develop
+    # image: ghcr.io/hotio/prowlarr:testing
+
+  unpackerr:
+    <<: *service-base
+    container_name: unpackerr
+    hostname: unpackerr
+    networks:
+      apps: {}
+    logging: *logging-default
+    # Dedicated health endpoint is unverified; retain root fallback.
+    healthcheck:
+      test: curl --fail --silent --show-error http://localhost:5656 || exit 1
+      interval: 20s
+      retries: 5
+      start_period: 30s
+      timeout: 5s
+    environment:
+      <<: *common-env
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ${DOCKER_DIR}/unpackerr:/config
+      - ${DATA_DIR}:/data:rw
+    image: ghcr.io/hotio/unpackerr:latest
+
+  autobrr:
+    <<: *service-base
+    container_name: autobrr
+    hostname: autobrr
+    networks:
+      apps: {}
+    logging: *logging-default
+    healthcheck:
+      test: curl --fail --silent --show-error http://localhost:7474/api/healthz/liveness || exit 1
+      interval: 20s
+      retries: 5
+      start_period: 30s
+      timeout: 5s
+    environment:
+      <<: *common-env
+      AUTOBRR__DATABASE_TYPE: sqlite
+    labels:
+      traefik.enable: true
+      traefik.http.routers.autobrr.rule: Host(`autobrr.${DOMAIN2}`)
+      traefik.http.routers.autobrr.entrypoints: websecure
+      traefik.http.routers.autobrr.tls: true
+      traefik.http.routers.autobrr.tls.certresolver: letsencrypt
+      traefik.http.routers.autobrr.tls.domains[0].main: autobrr.${DOMAIN2}
+      traefik.http.services.autobrr.loadbalancer.server.port: 7474
+      traefik.http.services.autobrr.loadbalancer.server.scheme: http
+      traefik.http.routers.autobrr.middlewares: authentik-media@docker
+    volumes:
+      - ${DOCKER_DIR}/autobrr:/config
+    image: ghcr.io/autobrr/autobrr:latest
+
+  notifiarr:
+    <<: *service-base
+    container_name: notifiarr
+    hostname: notifiarr
+    networks:
+      apps: {}
+    logging: *logging-default
+    # Dedicated health endpoint is unverified; retain root fallback.
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://localhost:5454 || exit 1
+      interval: 20s
+      retries: 5
+      start_period: 30s
+      timeout: 5s
+    environment:
+      <<: *common-env
+    labels:
+      traefik.enable: true
+      traefik.http.routers.notifiarr.rule: Host(`notifiarr.${DOMAIN2}`)
+      traefik.http.routers.notifiarr.entrypoints: websecure
+      traefik.http.routers.notifiarr.tls: true
+      traefik.http.routers.notifiarr.tls.certresolver: letsencrypt
+      traefik.http.routers.notifiarr.tls.domains[0].main: notifiarr.${DOMAIN2}
+      traefik.http.services.notifiarr.loadbalancer.server.port: 5454
+      traefik.http.services.notifiarr.loadbalancer.server.scheme: http
+      traefik.http.routers.notifiarr.middlewares: authentik-media@docker
+    volumes:
+      - ${DOCKER_DIR}/notifiarr:/config
+      - /var/run/utmp:/var/run/utmp
+      - /etc/machine-id:/etc/machine-id:ro
+    image: golift/notifiarr
+
+  bazarr:
+    <<: *service-base
+    container_name: bazarr
+    hostname: bazarr
+    networks:
+      apps: {}
+    logging: *logging-default
+    # Dedicated health endpoint is unverified; retain root fallback.
+    healthcheck:
+      test: curl --fail --silent --show-error http://localhost:6767 || exit 1
+      interval: 20s
+      retries: 5
+      start_period: 30s
+      timeout: 5s
+    environment:
+      <<: *common-env
+      DOCKER_MODS: ghcr.io/themepark-dev/theme.park:bazarr
+      TP_THEME: ${TP_THEME}
+      TP_ADDON: bazarr-4k-logo
+    labels:
+      traefik.enable: true
+      traefik.http.routers.bazarr.rule: Host(`bazarr.${DOMAIN2}`)
+      traefik.http.routers.bazarr.entrypoints: websecure
+      traefik.http.routers.bazarr.tls: true
+      traefik.http.routers.bazarr.tls.certresolver: letsencrypt
+      traefik.http.routers.bazarr.tls.domains[0].main: bazarr.${DOMAIN2}
+      traefik.http.services.bazarr.loadbalancer.server.port: 6767
+      traefik.http.services.bazarr.loadbalancer.server.scheme: http
+      traefik.http.routers.bazarr.middlewares: authentik-media@docker
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ${DOCKER_DIR}/bazarr:/config
+      - ${DATA_DIR}/media:/data/media
+    image: lscr.io/linuxserver/bazarr:development
+    # image: ghcr.io/hotio/bazarr:nightly
+
+  arr-scripts:
+    <<: *service-base
+    container_name: arr-scripts
+    hostname: arr-scripts
+    networks:
+      apps: {}
+    logging: *logging-default
+    environment:
+      <<: *common-env
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ${DOCKER_DIR}/arr-scripts:/config
+      - ${DOCKER_DIR}/arr-scripts/custom-services.d:/custom-services.d
+      - ${DOCKER_DIR}/arr-scripts/custom-cont-init.d:/custom-cont-init.d
+      - ${DATA_DIR}/downloads:/data/downloads:rw
+      - ${DATA_DIR}/media:/data/media:rw
+    image: lsiobase/alpine:3.23
+
+  sonarr:
+    <<: *service-base
+    container_name: sonarr
+    hostname: sonarr
+    networks:
+      apps: {}
+    logging: *logging-default
+    healthcheck:
+      test: curl --fail --silent --show-error http://localhost:8989/ping || exit 1
+      interval: 15s
+      retries: 8
+      start_period: 45s
+      timeout: 5s
+    environment:
+      <<: *common-env
+      DOCKER_MODS: ghcr.io/themepark-dev/theme.park:sonarr
+      TP_THEME: ${TP_THEME}
+      TP_ADDON: sonarr-4k-text-logo
+    labels:
+      traefik.enable: true
+      traefik.http.routers.sonarr.rule: Host(`sonarr.${DOMAIN2}`)
+      traefik.http.routers.sonarr.entrypoints: websecure
+      traefik.http.routers.sonarr.tls: true
+      traefik.http.routers.sonarr.tls.certresolver: letsencrypt
+      traefik.http.routers.sonarr.tls.domains[0].main: sonarr.${DOMAIN2}
+      traefik.http.services.sonarr.loadbalancer.server.port: 8989
+      traefik.http.services.sonarr.loadbalancer.server.scheme: http
+      traefik.http.routers.sonarr.middlewares: authentik-media@docker
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ${DOCKER_DIR}/sonarr:/config
+      - ${DATA_DIR}:/data
+    depends_on:
+      sabnzbd:
+        condition: service_healthy
+      nzbget:
+        condition: service_healthy
+    image: lscr.io/linuxserver/sonarr:develop
+    # image: ghcr.io/hotio/sonarr:nightly
+
+  radarr:
+    <<: *service-base
+    container_name: radarr
+    hostname: radarr
+    networks:
+      apps: {}
+    logging: *logging-default
+    healthcheck:
+      test: curl --fail --silent --show-error http://localhost:7878/ping || exit 1
+      interval: 15s
+      retries: 8
+      start_period: 45s
+      timeout: 5s
+    environment:
+      <<: *common-env
+      DOCKER_MODS: ghcr.io/themepark-dev/theme.park:radarr
+      TP_THEME: ${TP_THEME}
+      TP_ADDON: radarr-4k-logo
+    labels:
+      traefik.enable: true
+      traefik.http.routers.radarr.rule: Host(`radarr.${DOMAIN2}`)
+      traefik.http.routers.radarr.entrypoints: websecure
+      traefik.http.routers.radarr.tls: true
+      traefik.http.routers.radarr.tls.certresolver: letsencrypt
+      traefik.http.routers.radarr.tls.domains[0].main: radarr.${DOMAIN2}
+      traefik.http.services.radarr.loadbalancer.server.port: 7878
+      traefik.http.services.radarr.loadbalancer.server.scheme: http
+      traefik.http.routers.radarr.middlewares: authentik-media@docker
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ${DOCKER_DIR}/radarr:/config
+      - ${DATA_DIR}:/data
+    depends_on:
+      sabnzbd:
+        condition: service_healthy
+      nzbget:
+        condition: service_healthy
+    image: lscr.io/linuxserver/radarr:develop
+    # image: ghcr.io/hotio/radarr:testing
+
+  lidarr:
+    <<: *service-base
+    container_name: lidarr
+    hostname: lidarr
+    networks:
+      apps: {}
+    logging: *logging-default
+    cap_add:
+      - NET_ADMIN
+    sysctls:
+      - net.ipv4.conf.all.src_valid_mark=1
+      - net.ipv6.conf.all.disable_ipv6=1
+    healthcheck:
+      test: curl --fail --silent --show-error http://localhost:8686/ping || exit 1
+      interval: 15s
+      retries: 8
+      start_period: 45s
+      timeout: 5s
+    environment:
+      <<: *common-env
+      # DOCKER_MODS: ghcr.io/themepark-dev/theme.park:lidarr
+      # TP_THEME: ${TP_THEME}
+    labels:
+      traefik.enable: true
+      traefik.http.routers.lidarr.rule: Host(`lidarr.${DOMAIN2}`)
+      traefik.http.routers.lidarr.entrypoints: websecure
+      traefik.http.routers.lidarr.tls: true
+      traefik.http.routers.lidarr.tls.certresolver: letsencrypt
+      traefik.http.routers.lidarr.tls.domains[0].main: lidarr.${DOMAIN2}
+      traefik.http.services.lidarr.loadbalancer.server.port: 8686
+      traefik.http.services.lidarr.loadbalancer.server.scheme: http
+      traefik.http.routers.lidarr.middlewares: authentik-media@docker
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ${DOCKER_DIR}/lidarr:/config
+      - ${DATA_DIR}:/data
+    depends_on:
+      sabnzbd:
+        condition: service_healthy
+      nzbget:
+        condition: service_healthy
+      slskd:
+        condition: service_healthy
+    build:
+      context: .
+      dockerfile: ./lidarr.Dockerfile
+      pull: true
+
+  praxrr:
+    <<: *service-base
+    container_name: praxrr
+    hostname: praxrr
+    networks:
+      apps: {}
+    logging: *logging-default
+    # Dedicated health endpoint is unverified; retain root fallback.
+    healthcheck:
+      test: curl --fail --silent  http://localhost:6868 || exit 1
+      interval: 20s
+      retries: 5
+      start_period: 30s
+      timeout: 5s
+    environment:
+      <<: *common-env
+      AUTH: off
+      PRAXRR_PCD_MIGRATION_MODE: ${PRAXRR_PCD_MIGRATION_MODE:-hybrid}
+      PRAXRR_PCD_MIGRATION_ALLOW_LEGACY_FALLBACK: ${PRAXRR_PCD_MIGRATION_ALLOW_LEGACY_FALLBACK:-false}
+      PRAXRR_DEFAULT_DB_URL: ${PRAXRR_DEFAULT_DB_URL:-https://github.com/${PRAXRR_DEFAULT_DB_GIT_USERNAME}/praxrr-db}
+      PRAXRR_DEFAULT_DB_BRANCF: ${PRAXRR_DEFAULT_DB_BRANCH:-develop}
+      PRAXRR_DEFAULT_DB_NAME: Praxrr-db
+      PRAXRR_DEFAULT_DB_TOKEN: ${PRAXRR_DEFAULT_DB_TOKEN}
+      PRAXRR_DEFAULT_DB_GIT_USERNAME: ${PRAXRR_DEFAULT_DB_GIT_USERNAME}
+      PRAXRR_DEFAULT_DB_GIT_EMAIL: ${PRAXRR_DEFAULT_DB_GIT_EMAIL}
+      PRAXRR_SCHEMA_REF: develop
+      ARR_CREDENTIAL_MASTER_KEY: ${ARR_CREDENTIAL_MASTER_KEY}
+      ARR_CREDENTIAL_MASTER_KEY_VERSION: v1
+      # ARR_CREDENTIAL_PREVIOUS_KEYS: ${ARR_CREDENTIAL_PREVIOUS_KEYS} # optional: JSON map for key rotation
+      # Optional Arr instances via environment at startup
+      LIDARR_INSTANCE_NAME_1: Lidarr # Optional (Generated if not provided)
+      LIDARR_INSTANCE_URL_1: http://lidarr:8686
+      LIDARR_INSTANCE_EXTERNAL_URL_1: ${LIDARR_EXTERNAL_URL} # Optional
+      LIDARR_INSTANCE_API_KEY_1: ${LIDARR_API_KEY}
+      LIDARR_INSTANCE_TAGS_1: music,flac,lossless
+      RADARR_INSTANCE_NAME_1: Radarr # Optional (Generated if not provided)
+      RADARR_INSTANCE_URL_1: http://radarr:7878
+      RADARR_INSTANCE_EXTERNAL_URL_1: ${RADARR_EXTERNAL_URL} # Optional
+      RADARR_INSTANCE_API_KEY_1: ${RADARR_API_KEY}
+      RADARR_INSTANCE_TAGS_1: movies,4k
+      SONARR_INSTANCE_NAME_1: Sonarr # Optional (Generated if not provided)
+      SONARR_INSTANCE_URL_1: http://sonarr:8989
+      SONARR_INSTANCE_EXTERNAL_URL_1: ${SONARR_EXTERNAL_URL} # Optional
+      SONARR_INSTANCE_API_KEY_1: ${SONARR_API_KEY}
+      SONARR_INSTANCE_TAGS_1: tv,4k
+      PRAXRR_VALIDATE_INSTANCES: false
+      PULL_ON_START: true
+      PULL_ON_START_MAX_CONCURRENCY: 3
+      PULL_ON_START_TIMEOUT_MS: 30000
+    labels:
+      traefik.enable: true
+      traefik.http.routers.praxrr.rule: Host(`praxrr.${DOMAIN2}`)
+      traefik.http.routers.praxrr.entrypoints: websecure
+      traefik.http.routers.praxrr.tls: true
+      traefik.http.routers.praxrr.tls.certresolver: letsencrypt
+      traefik.http.routers.praxrr.tls.domains[0].main: praxrr.${DOMAIN2}
+      traefik.http.services.praxrr.loadbalancer.server.port: 6868
+      traefik.http.services.praxrr.loadbalancer.server.scheme: http
+      traefik.http.routers.praxrr.middlewares: authentik-media@docker
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ${DOCKER_DIR}/praxrr:/config
+    image: ghcr.io/yandy-r/praxrr:develop
+
+  plex:
+    <<: *service-base
+    container_name: plex
+    hostname: plex
+    networks:
+      apps: {}
+    logging: *logging-default
+    healthcheck:
+      test: curl --fail --silent http://localhost:32400/identity || exit 1
+      interval: 10s
+      retries: 5
+      start_period: 60s
+      timeout: 10s
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+    environment:
+      <<: *common-env
+      PLEX_UID: ${PUID}
+      PLEX_GID: ${PGID}
+      DEBUG: no
+      VERSION: latest
+      PLEX_CLAIM_TOKEN: ${PLEX_CLAIM}
+      PLEX_BETA_INSTALL: true
+      PLEX_ADVERTISE_URL: ${PLEX_ADVERTISE_URL}
+      DOCKER_MODS: ghcr.io/themepark-dev/theme.park:plex|linuxserver/mods:plex-absolute-hama|linuxserver/mods:plex-audnexus
+      TP_THEME: ${TP_THEME}
+      #-------------------------------------------------------------------------
+      # If you have an nvidia GPU
+      #-------------------------------------------------------------------------
+      # NVIDIA_VISIBLE_DEVICES: all
+      # NVIDIA_DRIVER_CAPABILITIES: compute,video,utility
+      #-------------------------------------------------------------------------
+    labels:
+      traefik.enable: true
+      traefik.http.routers.plex.rule: Host(`plex.${DOMAIN2}`)
+      traefik.http.routers.plex.entrypoints: websecure
+      traefik.http.routers.plex.tls: true
+      traefik.http.routers.plex.tls.certresolver: letsencrypt
+      traefik.http.routers.plex.tls.domains[0].main: plex.${DOMAIN2}
+      traefik.http.routers.plex.service: plex
+      # Public Cloudflare Tunnel hostname (infra/terraform/cloudflare); same backend as plex.
+      traefik.http.routers.plex-sync.rule: Host(`plex-sync.${DOMAIN2}`)
+      traefik.http.routers.plex-sync.entrypoints: websecure
+      traefik.http.routers.plex-sync.tls: true
+      traefik.http.routers.plex-sync.tls.certresolver: letsencrypt
+      traefik.http.routers.plex-sync.tls.domains[0].main: plex-sync.${DOMAIN2}
+      traefik.http.routers.plex-sync.service: plex
+      traefik.http.services.plex.loadbalancer.server.port: 32400
+      traefik.http.services.plex.loadbalancer.server.scheme: https
+      <<: *tsdproxy-rfapps
+      tsdproxy.name: "plex"
+      tsdproxy.dash.label: "Plex"
+      # Plex serves HTTPS on 32400 with a self-signed cert (same as Traefik scheme: https)
+      tsdproxy.port.1: "443/https:32400/https, no_tlsvalidate"
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      # Plex config directory - has to be on host filesyste, it writes a lot of small files
+      # Will break transcoding and slowdown streaming if put on a network share
+      - ${PLEX_DOCKER_DIR}/plex:/config
+      - ${PLEX_DOCKER_DIR}/plex-transcode:/transcode
+      - ${DATA_DIR}/media:/data/media
+    devices:
+      - /dev/dri:/dev/dri
+    image: ghcr.io/hotio/plex
+
+  plex-music:
+    <<: *service-base
+    container_name: plex-music
+    hostname: plex-music
+    networks:
+      apps: {}
+    logging: *logging-default
+    healthcheck:
+      test: curl --fail --silent http://localhost:32400/identity || exit 1
+      interval: 10s
+      retries: 5
+      start_period: 60s
+      timeout: 10s
+    environment:
+      <<: *common-env
+      PLEX_UID: ${PUID}
+      PLEX_GID: ${PGID}
+      DEBUG: no
+      VERSION: latest
+      PLEX_CLAIM_TOKEN: ${PLEX_CLAIM_MUSIC}
+      PLEX_BETA_INSTALL: true
+      PLEX_ADVERTISE_URL: ${PLEX_ADVERTISE_URL_MUSIC}
+      DOCKER_MODS: ghcr.io/themepark-dev/theme.park:plex|linuxserver/mods:plex-absolute-hama|linuxserver/mods:plex-audnexus
+      TP_THEME: ${TP_THEME}
+    labels:
+      traefik.enable: true
+      traefik.http.routers.plex-music.rule: Host(`plex-music.${DOMAIN2}`)
+      traefik.http.routers.plex-music.entrypoints: websecure
+      traefik.http.routers.plex-music.tls: true
+      traefik.http.routers.plex-music.tls.certresolver: letsencrypt
+      traefik.http.routers.plex-music.tls.domains[0].main: plex-music.${DOMAIN2}
+      traefik.http.services.plex-music.loadbalancer.server.port: 32400
+      traefik.http.services.plex-music.loadbalancer.server.scheme: https
+      <<: *tsdproxy-rfapps
+      tsdproxy.name: "plex-music"
+      tsdproxy.dash.label: "Plex Music"
+      # Plex serves HTTPS on 32400 with a self-signed cert (same as Traefik scheme: https)
+      tsdproxy.port.1: "443/https:32400/https, no_tlsvalidate"
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      # Plex config directory - has to be on host filesyste, it writes a lot of small files
+      # Will break transcoding and slowdown streaming if put on a network share
+      - ${PLEX_DOCKER_DIR}/plex-music:/config
+      - ${PLEX_DOCKER_DIR}/plex-music-transcode:/transcode
+      - ${DATA_DIR}/media:/data/media
+    devices:
+      - /dev/dri:/dev/dri
+    image: ghcr.io/hotio/plex
+
+  jellyfin:
+    <<: *service-base
+    container_name: jellyfin
+    hostname: jellyfin
+    networks:
+      apps: {}
+    logging: *logging-default
+    healthcheck:
+      test: curl --fail --silent http://localhost:8096/health || exit 1
+      interval: 10s
+      retries: 5
+      start_period: 60s
+      timeout: 5s
+    environment:
+      <<: *common-env
+      WEBUI_PORTS: 8096/tcp
+    labels:
+      traefik.enable: true
+      traefik.http.routers.jellyfin.rule: Host(`jellyfin.${DOMAIN2}`)
+      traefik.http.routers.jellyfin.entrypoints: websecure
+      traefik.http.routers.jellyfin.tls: true
+      traefik.http.routers.jellyfin.tls.certresolver: letsencrypt
+      traefik.http.routers.jellyfin.tls.domains[0].main: jellyfin.${DOMAIN2}
+      traefik.http.services.jellyfin.loadbalancer.server.port: 8096
+      traefik.http.services.jellyfin.loadbalancer.server.scheme: http
+      <<: *tsdproxy-rfapps
+      tsdproxy.name: "jellyfin"
+      tsdproxy.dash.label: "Jellyfin"
+      tsdproxy.port.1: "443/https:8096/http"
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ${DOCKER_DIR}/jellyfin:/config
+      - ${DOCKER_DIR}/jellyfin-transcode:/config/cache
+      - ${DATA_DIR}/media:/data/media
+    devices:
+      - /dev/dri:/dev/dri
+    image: ghcr.io/hotio/jellyfin:release
+
+  plex-ratings-sync:
+    container_name: plex-ratings-sync
+    hostname: plex-ratings-sync
+    restart: on-failure:10
+    pull_policy: always
+    logging: *logging-default
+    networks:
+      apps: {}
+    environment:
+      <<: *common-env
+    command: sync
+    volumes:
+      - ${DOCKER_DIR}/plex-ratings-sync:/app/data
+      - ${DATA_DIR}/media:/data/media:rw
+    image: ghcr.io/rfgamaral/plex-music-ratings-sync
+
+  ofelia:
+    <<: *service-base
+    container_name: ofelia
+    hostname: ofelia
+    command: daemon --docker
+    networks:
+      apps: {}
+    healthcheck:
+      test: ["CMD-SHELL", "tr '\\000' ' ' </proc/1/cmdline | grep -Eq 'ofelia|daemon'"]
+      interval: 20s
+      retries: 5
+      start_period: 40s
+      timeout: 5s
+    environment:
+      <<: *common-env
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    labels:
+      ofelia.job-run.plex-ratings-sync.schedule: "@every 6h"
+      ofelia.job-run.plex-ratings-sync.container: "plex-ratings-sync"
+    image: mcuadros/ofelia
+
+  kometa:
+    <<: *service-base
+    container_name: kometa
+    networks:
+      apps: {}
+    logging: *logging-default
+    healthcheck:
+      test: ["CMD-SHELL", "tr '\\000' ' ' </proc/1/cmdline | grep -Eq 'kometa|python'"]
+      interval: 20s
+      retries: 5
+      start_period: 40s
+      timeout: 5s
+    environment:
+      <<: *common-env
+      CONFIG_LOCATION: /config/config.yml
+      KOMETA_TIMES: "03:00"
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ${DOCKER_DIR}/kometa:/config
+      - ${DATA_DIR}/media:/data/media
+    image: kometateam/kometa:latest
+
+  tautulli:
+    <<: *service-base
+    container_name: tautulli
+    networks:
+      apps: {}
+    logging: *logging-default
+    healthcheck:
+      test: curl --fail --silent --show-error http://localhost:8181 || exit 1
+      interval: 20s
+      retries: 5
+      start_period: 30s
+      timeout: 5s
+    environment:
+      <<: *common-env
+      DOCKER_MODS: ghcr.io/themepark-dev/theme.park:tautulli
+      TP_THEME: ${TP_THEME}
+    labels:
+      traefik.enable: true
+      traefik.http.routers.tautulli.rule: Host(`tautulli.${DOMAIN2}`)
+      traefik.http.routers.tautulli.entrypoints: websecure
+      traefik.http.routers.tautulli.tls: true
+      traefik.http.routers.tautulli.tls.certresolver: letsencrypt
+      traefik.http.routers.tautulli.tls.domains[0].main: tautulli.${DOMAIN2}
+      traefik.http.services.tautulli.loadbalancer.server.port: 8181
+      traefik.http.services.tautulli.loadbalancer.server.scheme: http
+      traefik.http.routers.tautulli.middlewares: authentik-media@docker
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ${DOCKER_DIR}/tautulli:/config
+    image: lscr.io/linuxserver/tautulli:develop
+    # image: ghcr.io/hotio/tautulli:testing
+
+  plexseerr:
+    <<: *service-base
+    container_name: plexseerr
+    hostname: plexseerr
+    networks:
+      apps: {}
+    logging: *logging-default
+    healthcheck:
+      test: curl --fail --silent --show-error http://localhost:5055/api/v1/status || exit 1
+      start_period: 20s
+      timeout: 3s
+      interval: 15s
+      retries: 3
+    environment:
+      <<: *common-env
+      DOCKER_MODS: ghcr.io/themepark-dev/theme.park:overseerr
+      TP_THEME: ${TP_THEME}
+    labels:
+      traefik.enable: true
+      traefik.http.routers.plexseerr.rule: Host(`plexseerr.${DOMAIN2}`)
+      traefik.http.routers.plexseerr.entrypoints: websecure
+      traefik.http.routers.plexseerr.tls: true
+      traefik.http.routers.plexseerr.tls.certresolver: letsencrypt
+      traefik.http.routers.plexseerr.tls.domains[0].main: plexseerr.${DOMAIN2}
+      traefik.http.services.plexseerr.loadbalancer.server.port: 5055
+      traefik.http.services.plexseerr.loadbalancer.server.scheme: http
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ${DOCKER_DIR}/plexseerr:/config
+    image: ghcr.io/hotio/seerr:nightly
+
+  jellyseerr:
+    <<: *service-base
+    container_name: jellyseerr
+    hostname: jellyseerr
+    networks:
+      apps: {}
+    logging: *logging-default
+    healthcheck:
+      test: curl --fail --silent --show-error http://localhost:5055/api/v1/status || exit 1
+      start_period: 20s
+      timeout: 3s
+      interval: 15s
+      retries: 3
+    environment:
+      <<: *common-env
+      DOCKER_MODS: ghcr.io/themepark-dev/theme.park:overseerr
+      TP_THEME: ${TP_THEME}
+    labels:
+      traefik.enable: true
+      traefik.http.routers.jellyseerr.rule: Host(`jellyseerr.${DOMAIN2}`)
+      traefik.http.routers.jellyseerr.entrypoints: websecure
+      traefik.http.routers.jellyseerr.tls: true
+      traefik.http.routers.jellyseerr.tls.certresolver: letsencrypt
+      traefik.http.routers.jellyseerr.tls.domains[0].main: jellyseerr.${DOMAIN2}
+      traefik.http.services.jellyseerr.loadbalancer.server.port: 5055
+      traefik.http.services.jellyseerr.loadbalancer.server.scheme: http
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ${DOCKER_DIR}/jellyseerr:/config
+    image: ghcr.io/hotio/seerr:nightly
+
+  watchstate:
+    <<: *service-base
+    container_name: watchstate
+    hostname: watchstate
+    user: "0:0"
+    networks:
+      apps: {}
+    logging: *logging-default
+    healthcheck:
+      test: curl --fail --silent --show-error http://localhost:8080 || exit 1
+      interval: 20s
+      retries: 5
+      start_period: 30s
+      timeout: 5s
+    environment:
+      <<: *common-env
+    labels:
+      traefik.enable: true
+      traefik.http.routers.watchstate.rule: Host(`watchstate.${DOMAIN2}`)
+      traefik.http.routers.watchstate.entrypoints: websecure
+      traefik.http.routers.watchstate.tls: true
+      traefik.http.routers.watchstate.tls.certresolver: letsencrypt
+      traefik.http.routers.watchstate.tls.domains[0].main: watchstate.${DOMAIN2}
+      traefik.http.services.watchstate.loadbalancer.server.port: 8080
+      traefik.http.services.watchstate.loadbalancer.server.scheme: http
+      traefik.http.routers.watchstate.middlewares: authentik-media@docker
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ${DOCKER_DIR}/watchstate:/config
+    image: ghcr.io/arabcoders/watchstate:latest
+
+  immich-server:
+    <<: *service-base
+    container_name: immich-server
+    hostname: immich-server
+    networks:
+      apps: {}
+    logging: *logging-default
+    healthcheck:
+      test: curl --fail --silent --show-error http://localhost:2283/api/server/ping || exit 1
+      interval: 20s
+      retries: 5
+      start_period: 30s
+      timeout: 5s
+    environment:
+      <<: *common-env
+      DB_NAME: ${IMMICH_DB_NAME}
+      DB_USERNAME: ${IMMICH_DB_USERNAME}
+      DB_PASSWORD: ${IMMICH_DB_PASSWORD}
+      DB_HOSTNAME: immich-postgres
+      DB_PORT: 5432
+      REDIS_HOSTNAME: immich-redis
+      REDIS_PORT: 6379
+    labels:
+      traefik.enable: true
+      traefik.http.routers.immich.rule: Host(`images.${DOMAIN2}`)
+      traefik.http.routers.immich.entrypoints: websecure
+      traefik.http.routers.immich.tls: true
+      traefik.http.routers.immich.tls.certresolver: letsencrypt
+      traefik.http.routers.immich.tls.domains[0].main: images.${DOMAIN2}
+      traefik.http.services.immich.loadbalancer.server.port: 2283
+      traefik.http.services.immich.loadbalancer.server.scheme: http
+      <<: *tsdproxy-rfapps
+      tsdproxy.name: "images"
+      tsdproxy.dash.label: "Immich"
+      tsdproxy.port.1: "443/https:2283/http"
+    devices:
+      - /dev/dri:/dev/dri
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ${DOCKER_DIR}/immich:/config
+      - ${DATA_DIR}/photos:/data
+    depends_on:
+      - immich-ml
+      - immich-postgres
+      - immich-redis
+    image: ghcr.io/immich-app/immich-server:${IMMICH_VERSION:-release}
+
+  immich-ml:
+    <<: *service-base
+    container_name: immich-ml
+    hostname: immich-ml
+    networks:
+      apps: {}
+    logging: *logging-default
+    healthcheck:
+      test: ["CMD-SHELL", "tr '\\000' ' ' </proc/1/cmdline | grep -Eq 'immich|machine-learning|python'"]
+      interval: 20s
+      retries: 5
+      start_period: 40s
+      timeout: 5s
+    environment:
+      <<: *common-env
+    device_cgroup_rules:
+      - 'c 189:* rmw'
+    devices:
+      - /dev/dri:/dev/dri
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /dev/bus/usb:/dev/bus/usb
+      - model-cache:/cache
+    image: ghcr.io/immich-app/immich-machine-learning:${IMMICH_VERSION:-release}-openvino
+
+  immich-redis:
+    <<: *service-base
+    container_name: immich-redis
+    hostname: immich-redis
+    networks:
+      apps: {}
+    healthcheck:
+      test: redis-cli ping || exit 1
+      start_period: 20s
+      interval: 30s
+      retries: 5
+      timeout: 3s
+    logging: *logging-default
+    image: docker.io/valkey/valkey:8@sha256:81db6d39e1bba3b3ff32bd3a1b19a6d69690f94a3954ec131277b9a26b95b3aa
+
+  immich-postgres:
+    <<: *service-base
+    container_name: immich-postgres
+    hostname: immich-postgres
+    networks:
+      apps: {}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      start_period: 30s
+      interval: 30s
+      retries: 5
+      timeout: 5s
+    environment:
+      POSTGRES_DB: ${IMMICH_DB_NAME}
+      POSTGRES_USER: ${IMMICH_DB_USERNAME}
+      POSTGRES_PASSWORD: ${IMMICH_DB_PASSWORD}
+      POSTGRES_INITDB_ARGS: '--data-checksums'
+      DB_STORAGE_TYPE: 'HDD'
+    volumes:
+      - ${DOCKER_DIR}/immich-postgres:/var/lib/postgresql/data
+    shm_size: 128mb
+    image: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0@sha256:bcf63357191b76a916ae5eb93464d65c07511da41e3bf7a8416db519b40b1c23

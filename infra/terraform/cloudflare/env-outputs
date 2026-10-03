@@ -1,0 +1,2 @@
+# <terraform output> <env key> — written back after apply (dotenvx: encrypted into the env file; op: the referenced 1Password field).
+tunnel_token CF_TUNNEL_TOKEN

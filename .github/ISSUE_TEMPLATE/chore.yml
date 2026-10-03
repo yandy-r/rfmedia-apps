@@ -1,0 +1,61 @@
+name: Chore
+description: Track maintenance work that is not a feature, bug, or docs change.
+title: "[chore] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for maintenance tasks (dependency updates, cleanup, tooling, refactors without behavior changes).
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Pre-submission Checklist
+      options:
+        - label: This is maintenance work and not user-facing feature development.
+          required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      placeholder: Briefly describe the chore.
+    validations:
+      required: true
+  - type: textarea
+    id: why_now
+    attributes:
+      label: Why Now
+      placeholder: Why this task matters now.
+    validations:
+      required: true
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope
+      options:
+        - Small (1-2 files)
+        - Medium (3-5 files)
+        - Large (6+ files)
+      default: 0
+    validations:
+      required: true
+  - type: textarea
+    id: impacted_areas
+    attributes:
+      label: Impacted Areas
+      placeholder: Packages, services, workflows, docs, or tooling impacted.
+    validations:
+      required: true
+  - type: textarea
+    id: risks
+    attributes:
+      label: Risks
+      placeholder: Potential regressions or operational impact.
+    validations:
+      required: true
+  - type: textarea
+    id: verification
+    attributes:
+      label: Verification Plan
+      placeholder: Commands/checks proving completion.
+    validations:
+      required: true

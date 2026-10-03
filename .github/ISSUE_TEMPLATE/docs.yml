@@ -1,0 +1,56 @@
+name: Documentation
+description: Request documentation additions, corrections, or clarity updates.
+title: "[docs] "
+labels:
+  - documentation
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for docs gaps or improvements.
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Pre-submission Checklist
+      options:
+        - label: I checked existing docs for this topic first.
+          required: true
+  - type: textarea
+    id: gap
+    attributes:
+      label: Documentation Gap
+      placeholder: What is missing, unclear, or incorrect?
+    validations:
+      required: true
+  - type: textarea
+    id: audience
+    attributes:
+      label: Audience and Use Case
+      placeholder: Who needs this and in what scenario?
+    validations:
+      required: true
+  - type: textarea
+    id: locations
+    attributes:
+      label: Affected Documentation Paths
+      placeholder: |
+        - README.md
+        - docs/features/...
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed Content Changes
+      placeholder: Outline proposed edits and examples.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance Criteria
+      placeholder: |
+        - [ ] New docs explain X with example Y.
+        - [ ] Links are updated and valid.
+    validations:
+      required: true

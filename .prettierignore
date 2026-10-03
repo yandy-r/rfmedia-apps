@@ -1,0 +1,35 @@
+# Build outputs (node_modules auto-ignored by Prettier 3.x)
+dist/
+build/
+coverage/
+out/
+
+# Config files
+.markdownlintignore
+.markdownlintrc
+config/
+
+# github workflows
+.github/workflows/
+
+# Lock files (managed by package managers)
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+
+# Immutable upstream snapshots (preserve byte-for-byte provenance)
+packages/rfmedia-cli/openapi/lidarr-v1.json
+
+# Docker compose files (has specific formatting)
+compose.yml
+docker-compose*.yml
+
+# Environment files
+.env
+.env.*
+
+# SQL files (preserve manual formatting)
+*.sql
+
+# Changelog (often has specific formatting)
+CHANGELOG.md

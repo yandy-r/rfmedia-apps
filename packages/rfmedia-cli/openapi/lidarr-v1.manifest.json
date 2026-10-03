@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "upstream": {
+    "repository": "Lidarr/Lidarr",
+    "commit": "3e2858439ff35b372d0af00bcea1b0a357572d26",
+    "path": "src/Lidarr.Api.V1/openapi.json",
+    "url": "https://raw.githubusercontent.com/Lidarr/Lidarr/3e2858439ff35b372d0af00bcea1b0a357572d26/src/Lidarr.Api.V1/openapi.json",
+    "gitBlobSha": "bd42875a7ad5f41ba1d00381a65fe21ee376d410"
+  },
+  "snapshot": {
+    "path": "openapi/lidarr-v1.json",
+    "sha256": "4ae9e79e9662898ed4704ce80f091161587a9f0d664f9e518b11a038616e491f",
+    "size": 316102,
+    "openapiVersion": "3.0.4"
+  },
+  "generator": {
+    "package": "@hey-api/openapi-ts",
+    "version": "0.93.0",
+    "tarball": "https://registry.npmjs.org/@hey-api/openapi-ts/-/openapi-ts-0.93.0.tgz",
+    "integrity": "sha512-LzYpKHRSasPGJFP+UvgrvlhLBa5W0roqKJKAJCTbAMpAKutC0jcWegkYXD3m85RFpBU2aXFDJrG99hf3xw1QMA==",
+    "config": {
+      "path": "openapi-ts.config.mjs",
+      "version": 1,
+      "input": "openapi/lidarr-v1.json",
+      "output": "src/lib/lidarr/generated",
+      "tsConfig": "tsconfig.json",
+      "importFileExtension": ".js",
+      "sdkScope": "full-private",
+      "sdkOperations": "flat",
+      "sdkClient": false,
+      "generatedAuth": false
+    }
+  },
+  "bundledClient": {
+    "plugin": "@hey-api/client-fetch",
+    "versionIdentity": "bundled-with-@hey-api/openapi-ts@0.93.0",
+    "bundle": true,
+    "provenance": {
+      "sourcePackage": "@hey-api/openapi-ts",
+      "sourceVersion": "0.93.0",
+      "sourceTarball": "https://registry.npmjs.org/@hey-api/openapi-ts/-/openapi-ts-0.93.0.tgz",
+      "sourceIntegrity": "sha512-LzYpKHRSasPGJFP+UvgrvlhLBa5W0roqKJKAJCTbAMpAKutC0jcWegkYXD3m85RFpBU2aXFDJrG99hf3xw1QMA==",
+      "rawFileSha256": {
+        "client/client.gen.ts": "9dc5b7bc763a06539beec1a4396b8d1b807208f174e819f3cac7dca28d04cfbd",
+        "client/index.ts": "c50d41725f6889724224a3e39bb10c399c764799fbc0fee5c2b0b1f8def3224a",
+        "client/types.gen.ts": "c23034303dd9f8657e63771ca6a7b93fd99ddb9232ec4cb774b48905abf913fa",
+        "client/utils.gen.ts": "df6738845c0f2f648f7e8248556adea2f0f8d44690c175da9294073b60d3cf4f",
+        "core/auth.gen.ts": "dd54b258145c9a9b2fb58dce516e13e20075ee726e7fd4a19e04610f96f5d338",
+        "core/bodySerializer.gen.ts": "8967856966a98e6f8cbc2d94c0fdeba21901edfedd9eb5f11376a968aa826290",
+        "core/params.gen.ts": "39d0889fc384e7731c91ad9b0a6f783bf7feb37d77384dc5a859d5b85a12e092",
+        "core/pathSerializer.gen.ts": "41449b1807cd47b280b2c16e9684ec297b867e11f9f90dd1cb053408b58ed387",
+        "core/queryKeySerializer.gen.ts": "293a195d9a833f829ab172b024d68186d6a19e6b3636f14ae9b9d10858e7bfd0",
+        "core/serverSentEvents.gen.ts": "e773e599ccddc82ef00000323ba9c5e6cad3ab1ef75dc3417b4575b14e17c61a",
+        "core/types.gen.ts": "c0db1d86de1cb243e5c993ccc2e200f8fa557b4e9121a760772212b630236836",
+        "core/utils.gen.ts": "eba93e576e47320672acbd29293965f0bdbf29984badcd66b6e3301e26bc95f1"
+      },
+      "normalizedFileSha256": {
+        "client/client.gen.ts": "8b05351965da027de4a49b86aa86b26ed447f7008eae8bd9337916b8bdd81e6c"
+      }
+    }
+  },
+  "normalization": {
+    "version": 1,
+    "file": "client/client.gen.ts",
+    "search": "BodyInit",
+    "replacement": "RequestInit['body']",
+    "expectedMatches": 2,
+    "failureMode": "reject-unless-exact"
+  }
+}

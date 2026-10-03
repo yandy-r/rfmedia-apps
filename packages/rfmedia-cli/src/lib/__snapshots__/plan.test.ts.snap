@@ -1,0 +1,75 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`lib/plan > artifact round-trip > emits keys in fixed canonical order (snapshot) 1`] = `
+"{
+  "version": "rfmedia.copy-plan.v1",
+  "id": "11111111-2222-4333-8444-555555555555",
+  "createdAt": "2026-07-19T12:00:00.000Z",
+  "createdBy": {
+    "host": "plan-host",
+    "user": "plan-user",
+    "cliVersion": "0.5.0",
+    "cwd": "/work"
+  },
+  "command": "copy",
+  "destination": "/dest",
+  "execution": {
+    "mode": {
+      "type": "filter",
+      "rating": {
+        "minStars": 4,
+        "outputFolder": "liked-songs",
+        "preserveStructure": false
+      }
+    },
+    "albumOnly": false,
+    "hardlink": false,
+    "force": false,
+    "workers": 4
+  },
+  "optionsKey": "filter-s4",
+  "review": {
+    "advisory": true,
+    "note": "Snapshot of the dry-run preview at plan time.",
+    "granularity": "track",
+    "truncated": false,
+    "entries": [
+      {
+        "op": "create",
+        "kind": "copy",
+        "sourcePath": "/music/Artist/Album/track1.flac",
+        "destPath": "/dest/liked-songs/track1.flac",
+        "bytes": 1024,
+        "sourceSize": 1024,
+        "sourceMtimeMs": 1700000000000
+      }
+    ],
+    "summary": {
+      "create": 1,
+      "skip": 0,
+      "overwrite": 0,
+      "incomplete": 0,
+      "filtered": 2,
+      "files": 1,
+      "bytes": 1024
+    }
+  },
+  "fingerprints": {
+    "sources": [
+      {
+        "path": "/music/Artist",
+        "exists": true,
+        "fileCount": 3,
+        "totalBytes": 4096,
+        "maxMtimeMs": 1700000000000
+      }
+    ],
+    "destination": {
+      "path": "/dest",
+      "exists": false
+    }
+  },
+  "payloadChecksum": "sha256:362e5b6ccd0434767fc0aaeb0fa2a7373ae07f92fe359ca59f08fa6a1e42d8f2"
+}
+"
+`;

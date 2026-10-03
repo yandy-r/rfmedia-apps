@@ -1,0 +1,89 @@
+# Basic Smart Filter Examples
+# These filters demonstrate simple rating and genre-based filtering.
+#
+# YAML Indentation: Use 2 spaces per indent level (not tabs).
+# The structure uses 'match' for boolean logic (all = AND, any = OR)
+# and 'rules' for the conditions to apply.
+#
+# Rating values: Use star ratings from 1.0 to 5.0 (e.g., 4.0 = 4 stars).
+# The evaluation engine converts to normalized 0-1 scale internally.
+
+filters:
+  # Filter for highly-rated tracks (4+ stars)
+  # Useful for creating a "best of" collection
+  high-rated:
+    match: all # All rules must match (AND logic)
+    rules:
+      - type: rule
+        field: rating
+        operator: ">="
+        value: 4.0 # 4+ stars
+
+  # Filter for tracks rated 3+ stars
+  # Good for creating a broader "liked" collection
+  liked:
+    match: all
+    rules:
+      - type: rule
+        field: rating
+        operator: ">="
+        value: 3.0 # 3+ stars
+
+  # Filter for rock music with good ratings
+  # Combines genre and rating criteria
+  rock-favorites:
+    match: all # Both conditions must be true
+    rules:
+      - type: rule
+        field: rating
+        operator: ">="
+        value: 3.0 # 3+ stars
+      - type: rule
+        field: genre
+        operator: contains
+        value: Rock
+
+  # Filter for recent additions
+  # Useful for syncing newly added content
+  recent-additions:
+    match: all
+    rules:
+      - type: rule
+        field: date_added
+        operator: within
+        value: 30d # Added within the last 30 days
+
+  # Filter for low-rated tracks that may need re-rating
+  # Note: Truly unrated tracks have null ratings and are NOT matched by rating filters.
+  # This filter matches tracks with exactly 1 star (the minimum possible rating).
+  low-rated:
+    match: all
+    rules:
+      - type: rule
+        field: rating
+        operator: "<="
+        value: 1.0 # 1 star or less (minimum rating)
+
+  # Filter for specific year
+  # Copy tracks from a particular year
+  year-2024:
+    match: all
+    rules:
+      - type: rule
+        field: year
+        operator: "=="
+        value: 2024
+
+  # Filter for high-energy tracks by BPM
+  # Great for workout playlists
+  high-energy:
+    match: all
+    rules:
+      - type: rule
+        field: bpm
+        operator: ">="
+        value: 120
+      - type: rule
+        field: rating
+        operator: ">="
+        value: 3.0 # 3+ stars

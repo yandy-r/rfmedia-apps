@@ -1,0 +1,40 @@
+{
+  "worktreeCopyPatterns": [
+    ".env",
+    ".env**",
+    ".vscode/**",
+    ".venv/**",
+    "temp/**",
+    "package.json",
+    "tsconfig.json",
+    "*.config.js",
+    "*.config.ts",
+    "*.config.json",
+    ".gitignore",
+    ".editorconfig",
+    ".prettierrc*",
+    ".eslintrc*",
+    ".rfmedia.yaml",
+    ".rfmedia.yml",
+    ".rfmedia.json"
+  ],
+  "worktreeCopyIgnores": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/build/**",
+    "**/.git/**",
+    "**/Thumbs.db",
+    "**/.DS_Store",
+    "**/coverage/**",
+    "**/.nyc_output/**",
+    "**/logs/**",
+    "**/*.log"
+  ],
+  "worktreePathTemplate": "$BASE_PATH/../worktrees/rfmedia-apps/$BRANCH_NAME",
+  "postCreateCmd": [
+    "npm install || echo 'No package.json found, skipping npm install'",
+    "git config --local init.defaultBranch master || echo 'Using existing default branch'"
+  ],
+  "terminalCommand": "cursor .",
+  "deleteBranchWithWorktree": true
+}

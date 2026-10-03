@@ -1,0 +1,4071 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+rfmedia-cli is a TypeScript CLI tool for music library management that replaces legacy bash scripts (`cp-music.sh` and `del-empty.sh`). It provides album copying with numbered suffixes, rating-based track filtering, and empty directory cleanup.
+
+## Tech Stack
+
+- **Language**: TypeScript with ES2023 target
+- **Module System**: ESM with NodeNext resolution (`.js` extensions required in imports)
+- **Runtime**: Node.js 22+
+- **CLI Framework**: Commander.js v14
+- **Key Dependencies**:
+  - `music-metadata` - Audio file metadata/rating reading
+  - `better-sqlite3` - SQLite database for tracking system
+  - `p-limit` - Parallel task processing with concurrency limits
+  - `listr2` - Progress display and task management
+  - `chokidar` - File system watching
+  - `fast-glob` - File pattern matching
+  - `picocolors` - Terminal colors
+
+## Project Structure
+
+```
+rfmedia-cli/
+├── src/
+│   ├── cli.ts              # Main entry point, registers commands
+│   ├── commands/           # Command definitions (CLI interface layer)
+│   │   ├── copy.ts         # Copy command with album/filter modes
+│   │   ├── verify.ts       # Verify command with album/filter modes
+│   │   ├── clean.ts        # Empty directory cleanup command
+│   │   ├── watch.ts        # Directory watch command
+│   │   ├── undo.ts         # Undo/rollback command
+│   │   ├── migrate.ts      # Migrate legacy tracking/history files to SQLite
+│   │   ├── stats.ts        # Stats command with console formatting (Phase 5)
+│   │   ├── history.ts      # History command with console formatting (Phase 5)
+│   │   ├── playlist.ts     # Smart playlist management command
+│   │   ├── plugin.ts       # Plugin management command
+│   │   └── completion.ts   # Shell completion command
+│   ├── actions/            # Command implementations (business logic)
+│   │   ├── copy-album.ts   # Album mode: numbered copies (Album-001, etc.)
+│   │   ├── copy-filter.ts  # Filter mode: rating-based track copying
+│   │   ├── verify-album.ts # Album mode verification
+│   │   ├── verify-filter.ts # Filter mode verification (includes verifyAlbumMode)
+│   │   ├── clean.ts        # Empty folder detection and removal
+│   │   ├── watch.ts        # Watch mode implementation
+│   │   ├── undo.ts         # Undo execution logic
+│   │   ├── migrate-tracking.ts # Legacy file migration to SQLite database
+│   │   ├── stats.ts        # Statistics query implementation (Phase 5)
+│   │   ├── history.ts      # History query with date parsing (Phase 5)
+│   │   ├── playlist.ts     # Smart playlist create/update/list/show/delete
+│   │   ├── plugin.ts       # Plugin list/info/dir implementations
+│   │   └── completion.ts   # Shell completion script generation
+│   ├── lib/                # Shared utilities
+│   │   ├── audio.ts        # Audio file detection
+│   │   ├── completed-tracker.ts # Tracking routing (database/legacy modes)
+│   │   ├── convert.ts      # FFmpeg-based audio conversion
+│   │   ├── db.ts           # SQLite database initialization and CRUD
+│   │   ├── disk.ts         # Disk space checking utilities
+│   │   ├── filesystem.ts   # File operations (copy, link, remove)
+│   │   ├── filter-evaluator.ts # Smart filter evaluation with nested boolean logic
+│   │   ├── history.ts      # Operation history recording for undo
+│   │   ├── input-file.ts   # File-based source path reading
+│   │   ├── inventory.ts    # Inventory routing with InventoryContext
+│   │   ├── loaded-config.ts # Shared config state (avoids circular imports)
+│   │   ├── logger.ts       # Colored logging with log levels
+│   │   ├── parallel.ts     # p-limit wrapper for concurrent processing
+│   │   ├── plex.ts         # Plex Media Server API client
+│   │   ├── progress.ts     # listr2 wrapper for progress display
+│   │   ├── progress-bar.ts # Terminal progress bar with abort signal support
+│   │   ├── prompt.ts       # User confirmation prompts
+│   │   ├── range.ts        # Suffix range parsing and auto-range detection
+│   │   ├── ratings.ts      # Audio rating extraction (POPM, Vorbis)
+│   │   ├── schema.sql      # SQLite schema for tracking database
+│   │   ├── m3u.ts          # M3U playlist file read/write utilities
+│   │   ├── shell-completions/ # Shell completion script generators (bash/zsh/fish)
+│   │   │   ├── index.ts       # Re-exports per-shell generators
+│   │   │   ├── bash.ts        # Bash completion generator
+│   │   │   ├── zsh.ts         # Zsh completion generator
+│   │   │   └── fish.ts        # Fish completion generator
+│   │   ├── signal-handler.ts # Graceful interruption (SIGINT/SIGTERM) handling
+│   │   ├── verify.ts       # Album completeness verification
+│   │   ├── plugin-loader.ts  # Plugin discovery, loading, external command creation
+│   │   ├── plugin-manager.ts # Singleton manager with cleanup registration
+│   │   ├── plugin-runner.ts  # Hook execution engine with priority ordering
+│   │   └── external-command.ts # External process execution for command plugins
+│   └── types/              # TypeScript type definitions
+│       ├── index.ts        # Re-exports all types
+│       ├── db.ts           # Database types (DbConnection, DbOperation, etc.)
+│       ├── filters.ts      # Smart filter types (SmartFilter, FilterRule, FilterGroup)
+│       ├── inventory.ts    # Inventory types (InventoryContext, SyncDiff, etc.)
+│       ├── options.ts      # CopyOptions, CleanOptions, CopyMode, etc.
+│       ├── results.ts      # CopyResult, CleanResult, FailedOperation
+│       ├── tracking.ts     # Tracking types (TrackingConfig, TrackingState)
+│       ├── watch.ts        # Watch-specific types
+│       ├── history.ts      # Undo/history types (HistoryEntry, UndoOptions, etc.)
+│       ├── playlist.ts     # Smart playlist types (PlaylistSource, M3UPlaylistResult, etc.)
+│       ├── plugins.ts      # Plugin types (RfmediaPlugin, PluginHook, contexts)
+│       └── completion.ts   # Completion types (SupportedShell, CompletionOptions, CompletionResult)
+├── docs/
+│   ├── features/             # Feature-specific user guides
+│   │   ├── graceful-interruption.md # Graceful interruption architecture
+│   │   └── smart-filters.md  # Smart Filters comprehensive guide
+│   ├── plans/                # Implementation planning documents
+│   └── testing/              # Testing documentation
+├── dist/                   # Compiled output
+├── TODO.md                 # Future enhancements tracking
+└── README.md               # User documentation
+```
+
+## Development Commands
+
+```bash
+# Run in development (no build needed)
+npm run dev -- <command> [options]
+npm run dev -- copy /source /dest --range=001-005 --dry-run
+
+# Type checking only
+npm run typecheck
+
+# Build to dist/
+npm run build
+
+# Run tests
+npm test              # Watch mode
+npm run test:run      # Single run
+npm run test:coverage # With coverage
+
+# Clean build artifacts
+npm run clean
+```
+
+## Architecture Patterns
+
+### Command/Action Separation
+
+Commands in `src/commands/` define the CLI interface (arguments, options, help text) and delegate to actions in `src/actions/` for implementation. Commands are responsible for:
+
+- Parsing and validating CLI arguments
+- Building typed options objects from raw Commander.js options
+- Lazy loading action handlers for faster startup
+- JSON output formatting
+
+Actions contain the business logic and are framework-agnostic.
+
+### Media Server Adapter Boundary
+
+For Plex-backed actions, prefer the adapter boundary over direct `lib/plex.ts` imports.
+
+- Contract types: `src/types/media-server.ts`
+- Adapter implementation: `src/lib/adapters/plex-adapter.ts`
+- Factory entrypoints: `src/lib/adapters/action-helpers.ts`
+
+Use:
+
+- `resolveRequiredMediaServerAdapter(...)` for query/CRUD paths
+- `resolveOptionalScanAdapter(...)` for scan-only follow-up paths
+
+Direct `../lib/plex.js` imports are allowed only in the adapter layer and Plex library internals, not in migrated action modules. Validate with:
+
+```bash
+node packages/rfmedia-cli/scripts/check-direct-plex-imports.mjs
+```
+
+#### The Façade Rule (permanent architecture)
+
+`src/lib/adapters/plex-adapter.ts` is the **sole** composer of `src/lib/adapters/plex/*`. Nothing above it — not `adapters/index.ts`, not `actions/*`, not `commands/*`, not `lib/error-formatters.ts` — may name a `./plex/*` module.
+
+- The guard matches module specifiers as **raw text**, so `import type` is **not** exempt. A type-only `../lib/adapters/plex/errors.js` import is still a `private-plex-import` violation.
+- `check:architecture` runs under both `pretypecheck` and `prebuild`, so a violation breaks `npm run typecheck` **and** `npm run build`, not just a lint step.
+- When a consumer needs a symbol the façade does not export, **add it to the façade's re-export list**. Never import around it, and never widen `PRIVATE_PLEX_COMPOSER` or `PLEX_COMPATIBILITY_ALLOWLIST` in `scripts/check-direct-plex-imports.mjs`.
+- `src/commands/plex-auth.ts` and `src/actions/plex-auth.ts` are deliberately **not** on the compatibility allowlist: they must not import `src/types/plex*` either (`plex-compatibility-import`).
+
+#### Single Origin Authority
+
+`src/lib/plex-origin.ts` exports `normalizePlexOrigin` and is the **only** origin-normalization implementation. Both the adapter resolver's cross-origin guard and the `rfmedia plex auth` verbs call it.
+
+Never re-implement or copy it. A divergence between "the origin we enrolled" and "the origin the resolver looks up" produces a silent `not-enrolled` for a working enrollment, or a match looser than the cross-origin guard.
+
+#### Credential Resolution
+
+`buildPlexAdapterConfiguration` in `src/lib/adapters/index.ts` resolves exactly one credential per adapter, in this order: `--plex-token` → `plex.auth.mode: jwt` (enrolled) → `plex.token` → enrolled (opportunistic) → `missing`. There is no per-request fallback chain; "try JWT, on 401 try static" would be a credential-downgrade oracle.
+
+The cross-origin guard's condition (`overrides?.plexUrl !== undefined && overrides.plexToken === undefined`) and message are **frozen**. It is a presence test on the raw CLI override object, so an enrolled credential can never unlock an origin change. This is a standing recorded regression; `plex-adapter.test.ts` and `mcp/adapters.spec.ts` pin it.
+
+Any test that exercises the resolver without a token **must** set `RFMEDIA_PLEX_AUTH_DIR` to a `tmpdir()` in `beforeEach`, or it will read the developer's real credential store.
+
+### Discriminated Union Types for Modes
+
+The copy command uses discriminated unions to represent mutually exclusive modes:
+
+```typescript
+// src/types/options.ts
+export type CopyMode = { type: "album"; range: CopyRange } | { type: "filter"; rating: RatingFilter };
+```
+
+This pattern enables exhaustive type checking in switch statements and ensures mode-specific options are only present when appropriate.
+
+**Mode Detection with `--count`:**
+
+The `hasAlbumModeOptions()` function in `src/commands/copy.ts` determines album mode based on multiple sources:
+
+```typescript
+function hasAlbumModeOptions(options: RawCopyOptions, hasCliSourceEntries: boolean = false): boolean {
+  const copyConfig = getLoadedConfig().copy ?? {};
+  // Album mode if:
+  // 1. CLI --range provided
+  // 2. CLI --count provided
+  // 3. config.range is set
+  // 4. --file is provided (per-path ranges may exist in the file)
+  // 5. CLI source entries provided (may have per-path ranges)
+  return (
+    options.range !== undefined ||
+    options.count !== undefined ||
+    copyConfig.range !== undefined ||
+    options.file !== undefined ||
+    hasCliSourceEntries
+  );
+}
+```
+
+The `--count` option enables album mode without requiring an explicit range. The actual range is computed per-source during execution via auto-range detection.
+
+### Smart Filter Type System
+
+**User Documentation**: See `docs/features/smart-filters.md` for comprehensive user guide including examples, use cases, and troubleshooting.
+
+Smart filters use discriminated unions to represent the recursive filter structure:
+
+```typescript
+// src/types/filters.ts
+
+// Discriminated union for filter rules
+type SmartFilterRule = FilterRule | FilterGroup;
+
+// Leaf node - a single condition
+interface FilterRule {
+  type: "rule";
+  field: "rating" | "genre" | "artist" | "year" | "bpm" | "date_added";
+  operator: ">=" | "<=" | "==" | "contains" | "within";
+  value: string | number;
+}
+
+// Group node - nested boolean logic
+interface FilterGroup {
+  type: "group";
+  match: "all" | "any"; // AND vs OR
+  rules: SmartFilterRule[];
+}
+
+// Top-level filter definition
+interface SmartFilter {
+  match: "all" | "any";
+  rules: SmartFilterRule[];
+}
+```
+
+**Type System Benefits:**
+
+- Exhaustive switch statements with TypeScript's `never` type
+- Recursive type definition enables arbitrary nesting depth
+- Discriminator (`type: 'rule' | 'group'`) enables type narrowing
+
+### Smart Filter Evaluation Algorithm
+
+The evaluation engine uses recursive descent to process nested boolean logic:
+
+```typescript
+// src/lib/filter-evaluator.ts
+
+function evaluateFilter(filter: SmartFilter, metadata: ExtendedMetadata): boolean {
+  return evaluateGroup({ type: "group", match: filter.match, rules: filter.rules }, metadata);
+}
+
+function evaluateGroup(group: FilterGroup, metadata: ExtendedMetadata): boolean {
+  if (group.match === "all") {
+    // AND logic - all rules must pass
+    return group.rules.every((rule) => evaluateRule(rule, metadata));
+  } else {
+    // OR logic - at least one rule must pass
+    return group.rules.some((rule) => evaluateRule(rule, metadata));
+  }
+}
+
+function evaluateRule(rule: SmartFilterRule, metadata: ExtendedMetadata): boolean {
+  switch (rule.type) {
+    case "rule":
+      return evaluateFieldRule(rule, metadata);
+    case "group":
+      return evaluateGroup(rule, metadata);
+    default:
+      // TypeScript exhaustiveness check
+      const _exhaustive: never = rule;
+      throw new Error(`Unknown rule type: ${_exhaustive}`);
+  }
+}
+```
+
+**Performance Characteristics:**
+
+- Single-pass metadata extraction (genre, year, bpm, artist read once)
+- O(n) complexity where n = total rules across all nesting levels
+- Short-circuit evaluation (AND stops on first false, OR stops on first true)
+- Negligible overhead vs flat filters (< 1% for typical nested filters)
+
+### Smart Filter Configuration Loading
+
+Filters are loaded from YAML configuration (preferred) or JSON with validation:
+
+```typescript
+// src/lib/config.ts
+
+function loadFiltersConfig(configPath: string): FiltersConfigOptions {
+  const yaml = loadYamlConfig(configPath);
+  const filters = yaml.filters ?? {};
+  // ...
+```
+
+### Lazy Loading for Performance
+
+Action handlers are dynamically imported to improve CLI startup time:
+
+```typescript
+// In command handler
+if (copyOptions.mode.type === "album") {
+  const { executeAlbumCopyWithFileInput } = await import("../actions/copy-album.js");
+  result = await executeAlbumCopyWithFileInput(source, destination, copyOptions);
+}
+```
+
+### Parallel Processing Pattern
+
+File operations use `p-limit` via `src/lib/parallel.ts`:
+
+```typescript
+import { processInParallel } from "../lib/parallel.js";
+
+const results = await processInParallel(
+  items,
+  async (item) => {
+    /* process item */
+  },
+  {
+    workers,
+    onProgress: (completed, total) => {
+      /* update UI */
+    },
+  },
+);
+```
+
+### Verify Command Architecture
+
+The verify command mirrors the copy command's mode structure, supporting both album mode and filter mode verification. Each mode has its own action handler in `src/actions/`:
+
+**Album Mode (`src/actions/verify-album.ts`)**
+
+Verifies numbered album copies created by the copy command's album mode:
+
+- `executeAlbumVerify()` - Verifies artist folder with all album subdirectories
+- `executeAlbumVerifyWithFileInput()` - Handles multi-source and file-based input
+- `processAlbumVerification()` - Verifies all numbered copies of a single album
+- `verifyAlbumCopy()` - Compares source album to a single numbered copy
+
+**Filter Mode (`src/actions/verify-filter.ts`)**
+
+Verifies rating-filtered track copies. Operates in two sub-modes:
+
+1. **Flat Structure** (`executeFilterVerify()`): Tracks copied to a single output folder
+2. **Album Mode** (`verifyAlbumMode()`): Tracks grouped by album with numbered suffixes
+
+The `verifyAlbumMode()` function handles the hybrid case where filter mode is combined with range-based album copying:
+
+```typescript
+// When --min-stars and --range are both active with --album-mode
+// Verification groups tracks by album, filters by rating, then checks numbered copies
+async function verifyAlbumMode(
+  source: string,
+  destination: string,
+  artistName: string,
+  filter: RatingFilter,
+  options: VerifyOptions,
+): Promise<VerifyCommandResult>;
+```
+
+**verifyAlbumMode() Processing Flow:**
+
+1. Scan source directory for all audio files
+2. Read ratings in parallel, grouping liked tracks by album name
+3. For each album with liked tracks:
+   - Generate numbered suffixes from range (e.g., 001, 002, 003)
+   - Verify each numbered album copy (e.g., `Album-001/`, `Album-002/`)
+   - Check that only liked tracks exist in each copy
+   - Report missing files, size mismatches, and extra files
+
+**Parallel with Copy Command:**
+
+| Copy Action                      | Verify Action                        | Purpose                     |
+| -------------------------------- | ------------------------------------ | --------------------------- |
+| `copy-album.ts`                  | `verify-album.ts`                    | Range-based numbered copies |
+| `copy-filter.ts`                 | `verify-filter.ts`                   | Rating-filtered tracks      |
+| `copyAlbumMode()` in copy-filter | `verifyAlbumMode()` in verify-filter | Filter + range hybrid       |
+
+### Verify Auto-Fix Mode
+
+The verify command supports automatic fixing of discrepancies with the `--fix` option. This feature re-copies missing files and removes extra files to bring the destination into sync with expected state.
+
+**CLI Options:**
+
+| Option    | Description                                                      |
+| --------- | ---------------------------------------------------------------- |
+| `--fix`   | Enable auto-fix mode (re-copy missing files, remove extra files) |
+| `--force` | Skip confirmation prompts (use with `--fix`)                     |
+| `--trash` | Move extra files to system trash instead of permanent deletion   |
+
+**Architecture Overview:**
+
+Fix logic is implemented in both action files to handle their respective modes:
+
+- **`fixAlbumCopy()`** in `src/actions/verify-album.ts` (lines 262-406)
+- **`fixFilteredTracks()`** in `src/actions/verify-filter.ts` (lines 254-407)
+
+Both functions share the same pattern:
+
+1. Group issues by type (missing, size-mismatch, present/extra)
+2. Re-copy missing files from source using `copyOrLink()` or `convertFile()`
+3. Re-copy size-mismatched files only when `--force` is used
+4. Remove extra files with user confirmation (unless `--force` is used)
+
+**Key Implementation Details:**
+
+| Component                 | File                     | Description                       |
+| ------------------------- | ------------------------ | --------------------------------- |
+| `VerifiedFile.sourcePath` | `types/results.ts:76`    | Tracks source path for re-copying |
+| `FixResult`               | `types/results.ts:88-95` | Tracks fix operation counts       |
+| `copyOrLink()`            | `lib/filesystem.ts`      | File copy operation               |
+| `convertFile()`           | `lib/convert.ts`         | FFmpeg-based conversion           |
+| `remove()`                | `lib/filesystem.ts`      | Permanent file deletion           |
+| `moveToTrash()`           | `lib/filesystem.ts`      | System trash integration          |
+| `confirm()`               | `lib/prompt.ts`          | User confirmation prompts         |
+
+**Fix Behavior by Issue Type:**
+
+| Issue Type    | Behavior                        | Requires `--force`                   |
+| ------------- | ------------------------------- | ------------------------------------ |
+| Missing files | Re-copied from source           | No                                   |
+| Size mismatch | Re-copied (overwrites existing) | Yes                                  |
+| Extra files   | Removed with confirmation       | No (but skips prompt with `--force`) |
+
+**Integration Flow:**
+
+1. Verification runs and collects issues in `VerifiedFile[]`
+2. If `--fix` is enabled and issues exist (and not `--dry-run`):
+   - Issues are grouped by album destination (album mode) or processed flat (filter mode)
+   - `fixAlbumCopy()` or `fixFilteredTracks()` is called for each group
+   - Fix results aggregated into `VerifyCommandResult.fixResults`
+3. Counts are updated: `verified` increases by `copiedFiles`, `missing` decreases accordingly
+
+**Usage Patterns:**
+
+```bash
+# Safe mode: prompts before removing extra files
+rfmedia verify /source /dest --range=001-005 --fix
+
+# Force mode: no prompts, overwrites size mismatches
+rfmedia verify /source /dest --range=001-005 --fix --force
+
+# Trash mode: extra files go to system trash for recovery
+rfmedia verify /source /dest --range=001-005 --fix --trash
+
+# Combine force and trash for unattended operation with safety
+rfmedia verify /source /dest --range=001-005 --fix --force --trash
+
+# Dry-run mode: --fix is ignored (no actual changes)
+rfmedia verify /source /dest --range=001-005 --fix --dry-run
+```
+
+**JSON Output with Fix Results:**
+
+When `--fix` is used, the JSON output includes fix statistics:
+
+```json
+{
+  "command": "verify",
+  "mode": "album",
+  "result": {
+    "verified": 150,
+    "missing": 0,
+    "sizeMismatch": 0,
+    "extra": 0,
+    "fixResults": {
+      "copiedFiles": 5,
+      "removedFiles": 2,
+      "failedFixes": 0
+    }
+  }
+}
+```
+
+### Logging Architecture
+
+All log output goes to stderr to keep stdout clean for JSON output:
+
+- `logInfo()` - Blue informational messages
+- `logSuccess()` - Green success messages
+- `logWarn()` - Yellow warnings
+- `logError()` - Red errors
+- `logDebug()` - Debug messages (only when debug mode enabled)
+- `outputJson()` - JSON output to stdout (only when JSON mode enabled)
+
+## Key Type Definitions
+
+### CopyOptions
+
+```typescript
+interface CopyOptions {
+  mode: CopyMode; // Discriminated union: album or filter
+  albumOnly: boolean; // Treat source as single album
+  hardlink: boolean; // Use hardlinks instead of copies
+  convertFormat?: ConvertFormat; // Audio conversion target (alac, mp3, aac, opus)
+  force: boolean; // Overwrite existing files
+  dryRun: boolean; // Preview mode
+  workers: number; // Parallel workers (1-8)
+  file?: string; // Path to file with source paths
+  cliRange?: CopyRange; // CLI --range (highest priority)
+  configRange?: CopyRange; // Config default range (lowest priority)
+  count?: number; // Auto-range mode: number of copies to create
+}
+```
+
+### CopyResult
+
+```typescript
+interface CopyResult {
+  source: string;
+  created: number; // Files created
+  skipped: number; // Existing files skipped
+  filtered: number; // Tracks below rating threshold (filter mode)
+  failed: FailedOperation[];
+}
+```
+
+### Rating Types
+
+```typescript
+interface NormalizedRating {
+  value: number; // 0.0 to 1.0 scale
+  source: RatingSource; // 'POPM' | 'Vorbis' | 'iTunes' | 'unknown'
+  email?: string; // POPM email identifier
+}
+```
+
+### VerifyOptions
+
+```typescript
+interface VerifyOptions {
+  mode: CopyMode; // Same discriminated union as CopyOptions
+  albumOnly: boolean; // Treat source as single album
+  convertFormat?: ConvertFormat; // Expected format in destination
+  dryRun: boolean; // Preview mode (no-op for verify)
+  workers: number; // Parallel workers (1-8)
+  file?: string; // Path to file with source paths
+  verifySize?: boolean; // Enable file size verification
+  cliRange?: CopyRange; // CLI --range (highest priority)
+  configRange?: CopyRange; // Config range (lowest priority)
+  cliSourceEntries?: PathEntry[]; // Sources from CLI arguments
+}
+```
+
+### VerifyCommandResult
+
+```typescript
+interface VerifyCommandResult {
+  source: string; // Source path verified
+  verified: number; // Files present and matching
+  missing: number; // Files missing from destination
+  sizeMismatch: number; // Files with wrong sizes
+  extra: number; // Unexpected files in destination
+  expectedTotal: number; // Total files expected
+  issues: VerifiedFile[]; // Details of problematic files
+  failed: FailedOperation[];
+}
+```
+
+### PathEntry
+
+```typescript
+interface PathEntry {
+  path: string; // The source path
+  range?: CopyRange; // Optional per-path range
+}
+```
+
+Used for source paths with optional ranges, supporting two input methods:
+
+- **CLI arguments**: Multiple sources on command line (e.g., `rfmedia copy /path1,001-003 /path2,004-006 /dest`)
+- **File input**: Paths from `--file` option where each line can include a range suffix
+
+## Rating Detection
+
+The `src/lib/ratings.ts` module handles rating extraction:
+
+- **MP3**: POPM (Popularimeter) frames from ID3v2.3/ID3v2.4 tags (0-255 scale)
+- **FLAC/OGG/Opus**: Vorbis Comment RATING field (auto-detects 0-1, 0-5, or 0-100 scale)
+- **M4A/AAC**: Limited support (iTunes stores ratings in database, not file metadata)
+
+All ratings are normalized to 0.0-1.0 internally.
+
+## GitHub Contribution Templates
+
+When creating GitHub issues or pull requests, all coding agents must follow repository templates exactly.
+
+### Issue Templates (Required)
+
+- Always use GitHub issue forms from `.github/ISSUE_TEMPLATE/`; do not open blank issues.
+- Choose the correct form:
+  - Enhancement: `.github/ISSUE_TEMPLATE/enhancement.yml`
+  - Bug: `.github/ISSUE_TEMPLATE/bug.yml`
+  - Question: `.github/ISSUE_TEMPLATE/question.yml`
+  - Documentation: `.github/ISSUE_TEMPLATE/docs.yml`
+  - Chore: `.github/ISSUE_TEMPLATE/chore.yml`
+  - Security hardening (public-safe only): `.github/ISSUE_TEMPLATE/security.yml`
+- For exploitable vulnerabilities or sensitive security details, do not use public issues; use private reporting from `.github/ISSUE_TEMPLATE/config.yml` (`Private Security Report` link).
+
+### Pull Request Template (Required)
+
+- Always use `.github/pull_request_template.md` as the PR body baseline.
+- Preserve required sections:
+  - `## Summary`
+  - `## Changes`
+  - `## Testing`
+  - `## Related Issues` (use `Closes #<issue-number>` when applicable)
+  - `## Breaking Changes`
+  - `## Risk and Rollback`
+  - `## Checklist`
+- Include exact verification commands and pass/fail outcomes in `## Testing`.
+
+### Agent Markdown Mirrors
+
+- For offline drafting, automation, or agent-generated artifacts, use markdown mirrors in `docs/templates/github/`.
+- Mirror files are drafting aids only; GitHub issue forms and PR template remain the source of truth for final submissions.
+
+## Code Quality Standards
+
+### Type Safety Requirements
+
+- **NEVER use `any` type** - look up proper types from libraries or define interfaces
+- Use `noUncheckedIndexedAccess: true` (array access returns `T | undefined`)
+- Prefer discriminated unions over optional properties for mode-specific data
+- Use proper generics for utility functions
+
+### Error Handling
+
+- **Throw errors early**, don't use fallbacks
+- Use custom error classes for actionable errors (e.g., `FfmpegNotFoundError`)
+- Include error codes from `NodeJS.ErrnoException` when available
+- Collect all errors without stopping (allow partial success)
+
+### Import Conventions
+
+ESM requires explicit `.js` extensions:
+
+```typescript
+// Correct
+import { readRating } from "./ratings.js";
+import type { CopyOptions } from "../types/index.js";
+
+// Incorrect
+import { readRating } from "./ratings";
+```
+
+### JSDoc Documentation
+
+Add JSDoc comments for all exported functions with:
+
+- Description of what the function does
+- `@param` tags for parameters
+- `@returns` tag for return value
+- `@throws` tag for errors
+
+## Testing
+
+Tests use Vitest and are co-located with source files in `src/lib/`:
+
+```bash
+npm test                    # Watch mode
+npm run test:run            # Single run
+npm run test:coverage       # Coverage report
+```
+
+**Key Test Files:**
+
+| File                                | Tests | Coverage Area                                                       |
+| ----------------------------------- | ----- | ------------------------------------------------------------------- |
+| `src/lib/inventory.test.ts`         | 42    | Sync diff detection, database/legacy routing, inventory context     |
+| `src/lib/completed-tracker.test.ts` | 40    | Granular tracking, range expansion, legacy migration, state routing |
+
+**Test Patterns:**
+
+- Tests use temporary directories with `mkdtemp()` for isolation
+- SQLite databases are created per-test and cleaned up in `afterEach()`
+- Dual-mode routing (database vs legacy) is tested for all tracking operations
+- Tests verify both TypeScript source and compiled JavaScript output
+
+## Testing Patterns and Best Practices
+
+This section documents critical testing patterns discovered during test development and debugging. Following these patterns prevents common issues with mock lifecycle management and test isolation.
+
+### Mock Lifecycle Management
+
+**Critical Distinction: `vi.clearAllMocks()` vs `vi.resetAllMocks()`**
+
+This is the most important testing pattern to understand:
+
+| Method               | Behavior                                                          | Use Case                                             |
+| -------------------- | ----------------------------------------------------------------- | ---------------------------------------------------- |
+| `vi.clearAllMocks()` | Clears call history but **preserves mock implementations**        | Use in `beforeEach()` for most tests                 |
+| `vi.resetAllMocks()` | Clears call history **AND resets implementations to `undefined`** | Use only when you need to reconfigure mocks entirely |
+
+**The Bug Pattern:**
+
+```typescript
+// WRONG: This resets mock implementations, causing subsequent tests to fail
+beforeEach(() => {
+  vi.resetAllMocks(); // Mock implementations are now undefined!
+});
+
+// CORRECT: This preserves mock implementations while clearing call counts
+beforeEach(() => {
+  vi.clearAllMocks(); // Mock implementations preserved, call history cleared
+});
+```
+
+**Why This Matters:**
+
+When using `vi.hoisted()` to define mock implementations at module scope, `vi.resetAllMocks()` will reset those implementations to `undefined`. This causes tests to fail with errors like "Cannot read property 'x' of undefined" because the mocked functions no longer return the expected values.
+
+### Mock Setup Pattern with `vi.hoisted()`
+
+The recommended pattern for setting up mocks uses `vi.hoisted()` to define mock implementations before `vi.mock()` factories execute:
+
+```typescript
+// Step 1: Define mock implementations with vi.hoisted()
+// This ensures mocks are available when vi.mock() factories execute
+const mockFunctions = vi.hoisted(() => ({
+  someFunction: vi.fn().mockReturnValue("default"),
+  anotherFunction: vi.fn().mockResolvedValue({ data: [] }),
+}));
+
+// Step 2: Use vi.mock() to replace modules with mocked versions
+vi.mock("../lib/some-module.js", () => ({
+  someFunction: mockFunctions.someFunction,
+  anotherFunction: mockFunctions.anotherFunction,
+}));
+
+// Step 3: In beforeEach, clear mocks but preserve implementations
+beforeEach(() => {
+  vi.clearAllMocks(); // NOT resetAllMocks!
+});
+
+// Step 4: In tests, configure specific return values as needed
+it("should handle specific case", async () => {
+  mockFunctions.someFunction.mockReturnValue("specific-value");
+  // ... test code
+});
+```
+
+### Config Loading Isolation
+
+The tracking system reads configuration on module load, which can interfere with tests. Always mock config loading to prevent side effects:
+
+```typescript
+// Mock config loading to prevent tracking system interference
+const mockConfig = vi.hoisted(() => ({
+  getLoadedConfig: vi.fn().mockReturnValue(null),
+  loadConfig: vi.fn().mockResolvedValue(null),
+}));
+
+vi.mock("../lib/config.js", () => ({
+  getLoadedConfig: mockConfig.getLoadedConfig,
+  loadConfig: mockConfig.loadConfig,
+}));
+```
+
+**Why This Matters:**
+
+Without mocking config loading:
+
+1. Tests may read the actual `.rfmedia.json` from the filesystem
+2. The tracking system may initialize and create database connections
+3. Tests become non-deterministic based on local configuration
+4. Cleanup becomes complex (database files, tracking state)
+
+### Test Options Pattern
+
+When testing copy or verify operations, explicitly disable tracking to prevent database side effects:
+
+```typescript
+const testOptions: CopyOptions = {
+  mode: { type: "filter", rating: { minRating: 0.8 } },
+  albumOnly: false,
+  hardlink: false,
+  force: false,
+  dryRun: false,
+  workers: 1,
+  trackCompleted: false, // IMPORTANT: Disable tracking in tests
+};
+```
+
+**Why This Matters:**
+
+- Tracking creates database connections and writes state
+- Tests should be isolated and not depend on external state
+- Setting `trackCompleted: false` ensures clean test execution
+
+### Complete Test File Template
+
+Here is a complete template for test files that follow all best practices:
+
+```typescript
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+// Step 1: Mock definitions with vi.hoisted()
+const mockDependencies = vi.hoisted(() => ({
+  readRating: vi.fn().mockResolvedValue({ value: 0.8, source: "POPM" }),
+  isAudioFile: vi.fn().mockReturnValue(true),
+}));
+
+const mockConfig = vi.hoisted(() => ({
+  getLoadedConfig: vi.fn().mockReturnValue(null),
+}));
+
+// Step 2: Apply mocks to modules
+vi.mock("../lib/ratings.js", () => ({
+  readRating: mockDependencies.readRating,
+}));
+
+vi.mock("../lib/audio.js", () => ({
+  isAudioFile: mockDependencies.isAudioFile,
+}));
+
+vi.mock("../lib/config.js", () => ({
+  getLoadedConfig: mockConfig.getLoadedConfig,
+}));
+
+describe("MyFeature", () => {
+  let tempDir: string;
+
+  beforeEach(async () => {
+    // Clear mocks but preserve implementations
+    vi.clearAllMocks();
+
+    // Create isolated temp directory
+    tempDir = await mkdtemp(join(tmpdir(), "test-"));
+  });
+
+  afterEach(async () => {
+    // Clean up temp directory
+    await rm(tempDir, { recursive: true, force: true });
+  });
+
+  it("should handle the happy path", async () => {
+    // Configure specific mock behavior for this test
+    mockDependencies.readRating.mockResolvedValue({
+      value: 0.9,
+      source: "Vorbis",
+    });
+
+    // Test code here...
+
+    expect(mockDependencies.readRating).toHaveBeenCalled();
+  });
+
+  it("should handle edge case", async () => {
+    // Different mock configuration for this test
+    mockDependencies.readRating.mockResolvedValue(null);
+
+    // Test code here...
+  });
+});
+```
+
+### Common Pitfalls to Avoid
+
+1. **Using `vi.resetAllMocks()` in `beforeEach()`**
+   - Symptom: Tests pass individually but fail when run together
+   - Fix: Use `vi.clearAllMocks()` instead
+
+2. **Not mocking config loading**
+   - Symptom: Tests create unexpected database files or tracking state
+   - Fix: Mock `getLoadedConfig` to return `null`
+
+3. **Not setting `trackCompleted: false` in test options**
+   - Symptom: Tests leave behind tracking state that affects other tests
+   - Fix: Explicitly disable tracking in test options
+
+4. **Defining mocks after `vi.mock()` calls**
+   - Symptom: Mocks are undefined when module factories execute
+   - Fix: Use `vi.hoisted()` to define mocks before `vi.mock()` calls
+
+5. **Not cleaning up temp directories**
+   - Symptom: Disk fills up over time, tests may conflict
+   - Fix: Use `afterEach()` to remove temp directories
+
+### Database Test Isolation
+
+For tests that require database operations:
+
+```typescript
+import { initializeDatabase } from "../lib/db.js";
+import type { DbConnection } from "../types/db.js";
+
+describe("Database tests", () => {
+  let db: DbConnection;
+  let tempDir: string;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    tempDir = await mkdtemp(join(tmpdir(), "db-test-"));
+    const dbPath = join(tempDir, "test.db");
+    db = await initializeDatabase(dbPath);
+  });
+
+  afterEach(async () => {
+    // Close database connection before removing directory
+    if (db) {
+      db.close();
+    }
+    await rm(tempDir, { recursive: true, force: true });
+  });
+});
+```
+
+### Troubleshooting Guide
+
+For detailed debugging techniques and a comprehensive checklist for resolving test failures, see the dedicated troubleshooting documentation:
+
+- **[Testing Troubleshooting Guide](docs/testing/troubleshooting.md)** - In-depth guide covering mock lifecycle issues, debugging techniques, common mistakes, and a debugging checklist
+
+## Common Tasks
+
+### Adding a New Command
+
+1. Create command definition in `src/commands/newcmd.ts`
+2. Create action implementation in `src/actions/newcmd.ts`
+3. Add types to `src/types/options.ts` and `src/types/results.ts`
+4. Register command in `src/cli.ts`
+5. Add completion candidates to **all three** shell templates in `src/lib/shell-completions/` and to the tree literal in `templates.spec.ts` (the spec asserts order-sensitive equality across bash, zsh, and fish simultaneously)
+6. Update README.md with usage documentation
+
+See the `completion` command (`src/commands/completion.ts`, `src/actions/completion.ts`, `src/types/completion.ts`) for a reference implementation that follows this pattern.
+
+For a **subcommand group** with a JSON envelope and a typed error taxonomy, see `plex auth` (`src/commands/plex-auth.ts`, `src/actions/plex-auth.ts`, `src/actions/plex-auth-envelope.ts`). It demonstrates the two rules most often gotten wrong:
+
+- Validate arguments **inside the action**, never in a Commander `argParser` — a parser that throws calls `process.exit(1)` before `.action()` runs.
+- Keep the action free of stdout writes and of `process.exitCode`; the command owns rendering and the exit code.
+
+### Adding a New Library Utility
+
+1. Create module in `src/lib/newutil.ts`
+2. Export functions with JSDoc documentation
+3. Add any new types to appropriate file in `src/types/`
+
+### Modifying Rating Detection
+
+The `src/lib/ratings.ts` module handles all rating formats. When adding support for new formats:
+
+1. Add detection in `readRating()` based on file extension
+2. Create format-specific parser function (e.g., `readNativePopm()`)
+3. Ensure normalization to 0.0-1.0 scale
+
+## Supported Audio Formats
+
+Defined in `src/types/index.ts`:
+
+```typescript
+const AUDIO_EXTENSIONS = [
+  "flac",
+  "wav",
+  "mp3",
+  "ogg",
+  "opus",
+  "m4a",
+  "aac",
+  "wma",
+  "aiff",
+  "ape",
+  "wv",
+  "alac",
+] as const;
+```
+
+## Conversion Formats
+
+Defined in `src/lib/convert.ts`:
+
+| Format | Codec          | Extension | Quality  |
+| ------ | -------------- | --------- | -------- |
+| `alac` | Apple Lossless | .m4a      | Lossless |
+| `mp3`  | libmp3lame     | .mp3      | 320kbps  |
+| `aac`  | AAC            | .m4a      | 256kbps  |
+| `opus` | libopus        | .opus     | 128kbps  |
+
+Conversion requires `ffmpeg` to be installed on the system.
+
+## Plex Integration
+
+The CLI supports automatic Plex Media Server library scanning after copy operations complete. Supports both batch scanning (at end of all operations) and per-source scanning (after each source completes).
+
+### Configuration
+
+Add to `.rfmedia.yaml`:
+
+```yaml
+plex:
+  url: "http://localhost:32400"
+  token: "YOUR_PLEX_TOKEN" # omit when this device is enrolled
+  auth:
+    mode: static # "static" (default) | "jwt"
+  scanAfterCopy: true
+  libraryName: "Music"
+  scanPerSource: false
+  libraries:
+    - path: "/mnt/media/music"
+      library: "Music"
+    - path: "/mnt/media/playlists"
+      library: "Playlists"
+```
+
+### Configuration Options
+
+| Option                      | Type    | Default   | Description                                              |
+| --------------------------- | ------- | --------- | -------------------------------------------------------- |
+| `url`                       | string  | -         | Plex Media Server URL (e.g., `http://localhost:32400`)   |
+| `token`                     | string  | -         | Plex authentication token (X-Plex-Token)                 |
+| `auth.mode`                 | string  | `static`  | `static` uses `plex.token`; `jwt` requires an enrollment |
+| `auth.storePath`            | string  | XDG path  | Credential-store path override. A path, never a secret   |
+| `auth.deviceName`           | string  | host name | Device label shown in the Plex account. Non-secret       |
+| `auth.refreshMarginSeconds` | number  | `300`     | Proactive refresh window (min 60, max 86400)             |
+| `scanAfterCopy`             | boolean | `false`   | Trigger library scan after copy operations               |
+| `libraryName`               | string  | -         | Default library to scan (if not auto-detected)           |
+| `scanPerSource`             | boolean | `false`   | Scan after each source instead of at end of batch        |
+| `libraries`                 | array   | -         | Path-to-library mappings for auto-detection              |
+
+`validatePlexConfigOptions` in `src/lib/config.ts` **must** have a branch for every declared `plex.*` field. A field declared in `src/types/config.ts` with no validator branch is silently dropped at load time — the shipped bug behind `pageSize`, `syncRatingsOnCopy`, and `syncOnCopyDefaults`. `plex.auth` has one; keep it that way.
+
+`buildConfigTemplate` (`src/lib/config.ts`) returns a plain object fed to `yaml.dump` and cannot carry commented blocks. Document new config in the README and `docs/features/plex-configuration.md` instead of trying to add it there.
+
+### CLI Options
+
+Override config settings per-operation:
+
+- `--plex-scan` / `--no-plex-scan` - Enable/disable Plex scan
+- `--plex-url <url>` - Override Plex server URL
+- `--plex-token <token>` - Override Plex authentication token
+- `--plex-library <name>` - Override library name to scan
+- `--plex-per-source` - Scan after each source (not at end)
+
+`--plex-token` outranks every other credential source and is the only way to point `--plex-url` at a different origin.
+
+### Plex Account Enrollment (`plex auth`)
+
+`rfmedia plex auth login | status | refresh | logout` — defined in `src/commands/plex-auth.ts`, implemented in `src/actions/plex-auth.ts`.
+
+Rules that are load-bearing, not stylistic:
+
+- **No flag in this group may take a secret value.** No `--plex-token`, `--plex-jwt`, `--plex-pin`, `--plex-refresh-token`. Flag values leak through `ps` and shell history.
+- **No Commander `argParser` anywhere in this group.** An `InvalidArgumentError` thrown from a parser is routed through `Command.error()` → `process.exit(1)` **before** `.action()` runs, bypassing the failure envelope, redaction, and every test. Validate inside the action.
+- **Output boundary.** The action returns a typed `{ command, result }` envelope or throws; it never writes to stdout and never sets `process.exitCode`. The command renders success via `formatOutput`, catches, calls the exported `buildPlexAuthFailureEnvelope`, prints it, and sets `process.exitCode = 1`.
+- `--output` / `--json` are declared on the **root** command and reconciled by `cli.ts`'s `preAction` hook. Commander recognizes root options on either side of a subcommand, so `rfmedia --output json plex auth status` and `rfmedia plex auth status --output json` are equivalent. No verb in this group declares its own `--output`, so nothing shadows the root flag (unlike `playlist create -o`).
+- Completions for all three shells live in `src/lib/shell-completions/{bash,zsh,fish}.ts` and **must change together** — `templates.spec.ts` asserts order-sensitive equality across all three simultaneously. Auth completions are 100% static: no config read, no store read, no adapter construction.
+
+### Usage Examples
+
+```bash
+# Use config file settings
+rfmedia copy /source /dest --range=001-005
+
+# Force Plex scan for this operation
+rfmedia copy /source /dest --range=001-005 --plex-scan
+
+# Disable Plex scan for this operation
+rfmedia copy /source /dest --range=001-005 --no-plex-scan
+
+# Override library name
+rfmedia copy /source /dest --plex-library="My Music"
+
+# Per-source scanning (scan after each source, not at end)
+rfmedia copy /source1 /source2 /dest --range=001-005 --plex-per-source
+```
+
+### Advanced: Per-Source Scanning
+
+When processing multiple sources via `--file` or multiple CLI arguments, per-source scanning triggers a Plex scan after each source completes instead of waiting until the end:
+
+```bash
+# Traditional batch scan (default): waits for all 20 sources before scanning
+rfmedia copy /dest --file=sources.txt --range=001-005 --plex-scan
+
+# Per-source scan: scans after each source completes
+rfmedia copy /dest --file=sources.txt --range=001-005 --plex-per-source
+```
+
+**Benefits:**
+
+- New content appears in Plex immediately after each source
+- No need to wait for all sources to complete
+- Uses path-based scanning for efficiency (only scans affected directories)
+
+### Advanced: Library Path Mappings
+
+Configure `libraries` to automatically detect which Plex library to scan based on the destination path:
+
+```json
+{
+  "plex": {
+    "libraries": [
+      { "path": "/mnt/media/music", "library": "Music" },
+      { "path": "/mnt/media/audiobooks", "library": "Audiobooks" },
+      { "path": "/mnt/media/podcasts", "library": "Podcasts" }
+    ]
+  }
+}
+```
+
+When copying to `/mnt/media/music/Artist/Album`, the CLI automatically:
+
+1. Matches the destination to the "Music" library
+2. Triggers a path-based scan for just that directory (not the entire library)
+
+### Plex API Reference
+
+The `src/lib/plex.ts` module handles Plex API communication:
+
+- `getPlexLibraries(config)` - Fetch all library sections
+- `findLibraryByName(config, name)` - Look up section ID by library name
+- `triggerPlexScan(config)` - Trigger full library scan (specific or all libraries)
+- `triggerPlexPathScan(config, sectionId, path)` - Trigger path-based scan
+- `triggerSourceScan(config, destPath)` - Auto-detect library and trigger path-based scan
+- `matchPathToLibraryName(config, destPath)` - Match destination to library using config mappings
+- `buildPlexConfig(configFile, cliOverrides)` - Build config from multiple sources
+
+### Path-Based Scanning
+
+The CLI uses the Plex API's path-based scan endpoint for efficiency:
+
+```
+GET /library/sections/{id}/refresh?path={folderPath}&X-Plex-Token={token}
+```
+
+This only scans the specified folder rather than the entire library, reducing Plex server load.
+
+### Error Handling
+
+Plex scan failures are logged as warnings but do not fail the copy operation:
+
+- Network errors - Connection refused, hostname not found, timeout
+- Authentication errors (401) - Invalid token
+- Library not found - Lists available library names
+- Path-based scan fallback - Falls back to full library scan if path matching fails
+
+## Plex Playlist Export
+
+The CLI supports exporting and syncing Plex playlists to local directories, with options for creating multiple numbered copies using range/count suffixes.
+
+### Type Definitions
+
+Playlist operations use types defined in `src/types/plex.ts`:
+
+**PlexPlaylist** - Playlist metadata from Plex API:
+
+```typescript
+interface PlexPlaylist {
+  ratingKey: string; // Unique playlist identifier
+  title: string; // Playlist name
+  smart: boolean; // Whether this is a smart (auto-updating) playlist
+  leafCount: number; // Number of tracks
+  duration: number; // Total duration in milliseconds
+  addedAt: number; // Unix timestamp when created
+  updatedAt: number; // Unix timestamp when last modified
+}
+```
+
+**PlaylistExportOptions** - Options for one-time playlist export:
+
+```typescript
+interface PlaylistExportOptions {
+  playlistName: string; // Name of playlist to export
+  destination: string; // Destination folder path
+  hardlink?: boolean; // Use hardlinks instead of copies
+  convertFormat?: ConvertFormat; // Convert to mp3/aac/opus/alac
+  preserveStructure?: boolean; // Keep artist/album folder hierarchy
+  flat?: boolean; // Output directly without playlist subfolder
+  folder?: string; // Custom folder name (mutually exclusive with flat)
+  workers?: number; // Parallel workers (default: 4)
+  dryRun?: boolean; // Preview without executing
+  progress?: boolean; // Show progress bar
+  plexScan?: boolean; // Trigger library scan after export
+  range?: CopyRange; // Explicit suffix range (e.g., 001-005)
+  count?: number; // Auto-detect next N copies
+}
+```
+
+**PlaylistSyncOptions** - Extends export options with sync-specific settings:
+
+```typescript
+interface PlaylistSyncOptions extends PlaylistExportOptions {
+  deleteRemoved?: boolean; // Remove tracks no longer in playlist
+}
+```
+
+**PlaylistExportResult** - Metrics from export/sync operation:
+
+```typescript
+interface PlaylistExportResult {
+  playlistName: string; // Name of exported playlist
+  totalTracks: number; // Total tracks in playlist
+  created: number; // Files successfully created
+  skipped: number; // Files skipped (already exist)
+  removed?: number; // Files removed (sync with deleteRemoved)
+  failed: FailedOperation[]; // Failed operations with error details
+  totalSize: number; // Total bytes copied
+}
+```
+
+### CLI Commands
+
+The `plex playlist` command group provides three subcommands:
+
+**`plex playlist list`** - List available Plex playlists:
+
+```bash
+rfmedia plex playlist list
+rfmedia plex playlist list --exportable
+rfmedia plex playlist list --plex-url http://192.168.1.100:32400 --plex-token TOKEN
+```
+
+**`plex playlist export <playlist-name> <destination>`** - Export playlist tracks:
+
+```bash
+# Basic export (creates destination/PlaylistName/ subfolder)
+rfmedia plex playlist export "My Favorites" /music/exports
+
+# Flat mode (no subfolder, files directly in destination)
+rfmedia plex playlist export "My Favorites" /music/exports --flat
+
+# Custom folder name
+rfmedia plex playlist export "My Favorites" /music/exports --folder "favorites-2024"
+
+# Preserve artist/album structure
+rfmedia plex playlist export "My Favorites" /music/exports --preserve-structure
+
+# With conversion and hardlinks
+rfmedia plex playlist export "My Favorites" /music/exports --convert mp3 --hardlink
+
+# Create multiple numbered copies
+rfmedia plex playlist export "My Favorites" /music/exports --range=001-003
+rfmedia plex playlist export "My Favorites" /music/exports --count=5
+```
+
+**`plex playlist sync <playlist-name> <destination>`** - Sync playlist with optional cleanup:
+
+```bash
+# Sync without removing old tracks
+rfmedia plex playlist sync "My Favorites" /music/exports
+
+# Sync and remove tracks no longer in playlist
+rfmedia plex playlist sync "My Favorites" /music/exports --delete-removed
+
+# Sync with range support
+rfmedia plex playlist sync "My Favorites" /music/exports --range=001-005 --delete-removed
+```
+
+### CLI Options Reference
+
+| Option                    | Description                                                  |
+| ------------------------- | ------------------------------------------------------------ |
+| `--hardlink`              | Use hardlinks instead of copies                              |
+| `--convert <format>`      | Convert to mp3, aac, opus, or alac                           |
+| `--preserve-structure`    | Keep artist/album folder hierarchy in destination            |
+| `--flat`                  | Output files directly to destination (no playlist subfolder) |
+| `--folder <name>`         | Custom folder name instead of playlist name                  |
+| `-w, --workers <n>`       | Number of parallel workers (default: 4)                      |
+| `--dry-run`               | Preview operations without executing                         |
+| `--no-progress`           | Disable progress bar                                         |
+| `--plex-scan`             | Trigger Plex library scan after operation                    |
+| `-r, --range <START-END>` | Range of suffixes to create (e.g., 001-010)                  |
+| `--count <n>`             | Auto-detect next N suffixes from existing files              |
+| `--delete-removed`        | (sync only) Remove tracks no longer in playlist              |
+
+### Architecture
+
+Playlist operations are implemented in `src/actions/plex-playlist.ts`:
+
+**`executePlaylistExport(options)`** - Main export function:
+
+1. Validates configuration and finds playlist by name
+2. Fetches track list from Plex API
+3. Determines effective destination (applies `--flat`, `--folder` logic)
+4. Handles range/count to build suffix array
+5. Processes tracks with parallel workers
+6. For range mode: first copy is full copy/convert, subsequent copies are hardlinks
+7. Triggers Plex scan if configured
+
+**`executePlaylistSync(options)`** - Sync function:
+
+1. Calls `executePlaylistExport()` to add new/missing files
+2. If `--delete-removed` is enabled:
+   - Builds set of expected destination paths using `buildExpectedDestPath()`
+   - Scans destination for existing audio files
+   - Removes files not in expected set
+
+**`listPlaylists(options)`** - List available playlists:
+
+- Fetches all audio playlists from Plex
+- Optionally filters to exportable (non-empty) playlists
+
+### Range/Count Implementation
+
+The `--range` and `--count` options create multiple suffixed copies of each track, optimized for hardlink efficiency.
+
+**`detectHighestFileSuffix(destDir)`** in `src/lib/range.ts`:
+
+- Scans destination directory for files matching pattern `*-XXX.ext` (3+ digit suffix)
+- Returns highest suffix number and padding width
+- Returns `null` if no numbered files found
+- Differs from `detectHighestSuffix()` which scans directories (for album folders)
+
+```typescript
+// Example: If Track-001.flac, Track-002.flac exist:
+await detectHighestFileSuffix("/music/Playlist");
+// Returns: { highestSuffix: 2, padWidth: 3 }
+```
+
+**Hardlink Optimization for Subsequent Suffix Copies**:
+
+When creating multiple copies (e.g., `--range=001-005`), the system optimizes by:
+
+1. First suffix (001): Full copy or conversion from source
+2. Subsequent suffixes (002-005): Hardlinks from the first copy
+
+This significantly reduces I/O and disk space for range operations:
+
+```typescript
+// In executePlaylistExport():
+const firstCopyPaths = new Map<string, string>();
+
+for (let suffixIndex = 0; suffixIndex < suffixes.length; suffixIndex++) {
+  const isFirstCopy = suffixIndex === 0;
+
+  if (isFirstCopy || suffix === null) {
+    // First copy: full copy/convert from source
+    await copyOrLink(trackPath, destPath, hardlink);
+    firstCopyPaths.set(trackPath, destPath);
+  } else {
+    // Subsequent copies: hardlink from first copy
+    const firstCopyPath = firstCopyPaths.get(trackPath);
+    await link(firstCopyPath, destPath);
+  }
+}
+```
+
+**`buildExpectedDestPath()` for Sync Path Calculation**:
+
+Used by sync operations to compute the expected set of destination files:
+
+```typescript
+function buildExpectedDestPath(
+  track: PlexTrack,
+  destination: string,
+  preserveStructure: boolean,
+  convertFormat: ConvertFormat | undefined,
+  usedNames: Map<string, number>,
+  suffix: string | null = null,
+): string;
+```
+
+- Handles filename collisions with numeric suffixes (-002, -003) in flat mode
+- Applies conversion extension changes (e.g., .flac to .mp3)
+- Adds range suffix if provided (e.g., Track-001.flac)
+
+### Export Folder Structure
+
+The destination structure depends on options:
+
+| Options                       | Structure                                           |
+| ----------------------------- | --------------------------------------------------- |
+| Default                       | `{dest}/{PlaylistName}/{filename}`                  |
+| `--preserve-structure`        | `{dest}/{PlaylistName}/{Artist}/{Album}/{filename}` |
+| `--flat`                      | `{dest}/{filename}`                                 |
+| `--flat --preserve-structure` | `{dest}/{Artist}/{Album}/{filename}`                |
+| `--folder <name>`             | `{dest}/{name}/{filename}`                          |
+
+### Key Files
+
+| File                           | Responsibility                                                   |
+| ------------------------------ | ---------------------------------------------------------------- |
+| `src/types/plex.ts`            | Type definitions (lines 364-495)                                 |
+| `src/actions/plex-playlist.ts` | Export/sync implementation, `buildExpectedDestPath()`            |
+| `src/lib/range.ts`             | `detectHighestFileSuffix()`, `buildAutoRange()`, `formatRange()` |
+| `src/lib/plex.ts`              | Plex API client: `getPlaylists()`, `getPlaylistTracks()`         |
+| `src/commands/plex.ts`         | CLI command definitions (lines 824-1088)                         |
+
+## Smart Playlists
+
+The smart playlists feature generates M3U/M3U8 playlist files from two source types:
+
+1. **Filter-based**: Uses named SmartFilter from config, evaluated against local audio file metadata
+2. **Plex playlist-based**: Fetches tracks from an existing Plex playlist via API
+
+Playlist definitions are persisted to SQLite for update support and generation history tracking.
+
+### Key Files
+
+| File                           | Purpose                                           |
+| ------------------------------ | ------------------------------------------------- |
+| `src/types/playlist.ts`        | Type definitions with discriminated unions        |
+| `src/commands/playlist.ts`     | CLI command definitions using Commander.js        |
+| `src/actions/playlist.ts`      | Business logic for create/update/list/show/delete |
+| `src/lib/m3u.ts`               | M3U file read/write utilities                     |
+| `src/actions/playlist.test.ts` | Tests for playlist actions                        |
+
+### CLI Commands
+
+The `playlist` command group provides five subcommands:
+
+**`playlist create <name>`** - Create a new M3U playlist:
+
+```bash
+# Create from a named filter
+rfmedia playlist create "My Playlist" -o /playlists/my.m3u8 --filter favorites
+
+# Create from a Plex playlist
+rfmedia playlist create "My Playlist" -o /playlists/my.m3u8 --plex-playlist "My Favorites"
+
+# Create with relative paths for portability
+rfmedia playlist create "Portable" -o /usb/playlist.m3u8 --filter favorites --relative
+
+# Dry-run to preview
+rfmedia playlist create "Test" -o /playlists/test.m3u8 --filter rock --dry-run
+```
+
+**`playlist update [name]`** - Update existing playlist(s):
+
+```bash
+# Update a specific playlist
+rfmedia playlist update "My Playlist"
+
+# Update all saved playlists
+rfmedia playlist update --all
+```
+
+**`playlist list`** - List all saved smart playlists:
+
+```bash
+rfmedia playlist list
+rfmedia playlist list --json
+```
+
+**`playlist show <name>`** - Show playlist details and history:
+
+```bash
+rfmedia playlist show "My Playlist"
+```
+
+**`playlist delete <name>`** - Delete a saved smart playlist:
+
+```bash
+rfmedia playlist delete "My Playlist"
+rfmedia playlist delete "My Playlist" --delete-file --force
+```
+
+### CLI Options Reference
+
+| Option                       | Description                                               |
+| ---------------------------- | --------------------------------------------------------- |
+| `-o, --output <path>`        | Output file path for M3U playlist (required)              |
+| `-f, --filter <name>`        | Named filter from config (conflicts with --plex-playlist) |
+| `-p, --plex-playlist <name>` | Plex playlist name (conflicts with --filter)              |
+| `-r, --relative`             | Use relative paths in playlist                            |
+| `--base-dir <path>`          | Base directory for computing relative paths               |
+| `--force`                    | Overwrite existing playlist file                          |
+| `--dry-run`                  | Preview without writing files                             |
+| `-a, --all`                  | Update all saved playlists                                |
+| `--delete-file`              | Also delete the M3U file when deleting playlist           |
+
+### Type Definitions
+
+The playlist feature uses discriminated unions for type-safe source handling:
+
+**PlaylistSource Discriminated Union** (`src/types/playlist.ts`):
+
+```typescript
+// Filter-based source
+interface FilterPlaylistSource {
+  type: "filter";
+  filterName: string;
+}
+
+// Plex playlist source
+interface PlexPlaylistSource {
+  type: "plex-playlist";
+  playlistName: string;
+}
+
+// Union type with type guards
+type PlaylistSource = FilterPlaylistSource | PlexPlaylistSource;
+
+function isFilterPlaylistSource(source: PlaylistSource): source is FilterPlaylistSource {
+  return source.type === "filter";
+}
+
+function isPlexPlaylistSource(source: PlaylistSource): source is PlexPlaylistSource {
+  return source.type === "plex-playlist";
+}
+```
+
+**M3UPlaylistOptions** - Options for creating a playlist:
+
+```typescript
+interface M3UPlaylistOptions {
+  name: string;
+  outputPath: string;
+  source: PlaylistSource;
+  relativePaths?: boolean;
+  baseDir?: string;
+  force?: boolean;
+  dryRun?: boolean;
+}
+```
+
+**M3UPlaylistResult** - Result from playlist creation:
+
+```typescript
+interface M3UPlaylistResult {
+  success: boolean;
+  outputPath: string;
+  trackCount: number;
+  tracks: M3UTrackInfo[];
+  failed: FailedOperation[];
+  skipped: number;
+}
+```
+
+**M3UTrackInfo** - Track information for M3U entries:
+
+```typescript
+interface M3UTrackInfo {
+  filePath: string;
+  title?: string;
+  artist?: string;
+  durationMs?: number;
+}
+```
+
+### Database Schema
+
+Three tables store smart playlist definitions and history (`src/lib/schema.sql`, lines 273-314):
+
+**`smart_playlists` table** - Playlist definitions:
+
+| Column           | Type    | Description                         |
+| ---------------- | ------- | ----------------------------------- |
+| `id`             | INTEGER | Primary key (auto-increment)        |
+| `created_at`     | TEXT    | ISO timestamp                       |
+| `updated_at`     | TEXT    | ISO timestamp                       |
+| `name`           | TEXT    | Unique playlist name                |
+| `output_path`    | TEXT    | Path to the M3U file                |
+| `source_type`    | TEXT    | `'filter'` or `'plex-playlist'`     |
+| `source_name`    | TEXT    | Filter name or Plex playlist name   |
+| `relative_paths` | INTEGER | Boolean: 1 if using relative paths  |
+| `track_count`    | INTEGER | Number of tracks in last generation |
+
+**`smart_playlist_history` table** - Generation history:
+
+| Column         | Type    | Description                    |
+| -------------- | ------- | ------------------------------ |
+| `id`           | INTEGER | Primary key                    |
+| `playlist_id`  | INTEGER | FK to smart_playlists.id       |
+| `generated_at` | TEXT    | ISO timestamp                  |
+| `track_count`  | INTEGER | Track count at generation time |
+
+**`smart_playlist_tracks` table** - Track details per generation:
+
+| Column        | Type    | Description                         |
+| ------------- | ------- | ----------------------------------- |
+| `id`          | INTEGER | Primary key                         |
+| `history_id`  | INTEGER | FK to smart_playlist_history.id     |
+| `track_order` | INTEGER | Position in playlist                |
+| `file_path`   | TEXT    | Path to audio file                  |
+| `title`       | TEXT    | Track title (nullable)              |
+| `artist`      | TEXT    | Artist name (nullable)              |
+| `duration_ms` | INTEGER | Duration in milliseconds (nullable) |
+
+### Database Type Definitions
+
+From `src/types/db.ts`:
+
+**DbSmartPlaylist** - Playlist record:
+
+```typescript
+interface DbSmartPlaylist {
+  id: number;
+  created_at: string;
+  updated_at: string;
+  name: string;
+  output_path: string;
+  source_type: "filter" | "plex-playlist";
+  source_name: string;
+  relative_paths: number;
+  track_count: number;
+}
+```
+
+**CreateSmartPlaylistParams** - Parameters for creating a playlist:
+
+```typescript
+interface CreateSmartPlaylistParams {
+  name: string;
+  outputPath: string;
+  sourceType: "filter" | "plex-playlist";
+  sourceName: string;
+  relativePaths?: boolean;
+}
+```
+
+### Architecture
+
+**Command/Action Separation:**
+
+The `playlistCommand` in `src/commands/playlist.ts` defines CLI options and delegates to action handlers in `src/actions/playlist.ts` via lazy imports:
+
+```typescript
+// In command handler
+const { executePlaylistCreate } = await import("../actions/playlist.js");
+await executePlaylistCreate(options);
+```
+
+**Filter Playlist Creation Flow:**
+
+1. Load named filter from config via `loadNamedFilter()`
+2. Get library paths from `plex.allowedLibraryRoots` config
+3. Discover audio files via `findAudioFiles()`
+4. Read extended metadata in parallel via `processInParallel()`
+5. Evaluate filter against each file via `evaluateSmartFilter()`
+6. Build `M3UTrackInfo[]` from matching tracks
+7. Write M3U file via `writeM3UPlaylist()`
+8. Record to database via `createSmartPlaylist()` and `recordPlaylistHistory()`
+
+**Plex Playlist Creation Flow:**
+
+1. Build Plex config via `getPlexConfig()`
+2. Find playlist by name via `findPlaylistByName()`
+3. Fetch tracks via `getPlaylistTracks()`
+4. Validate file paths via `getTrackFilePaths()`
+5. Build `M3UTrackInfo[]` from valid tracks
+6. Write M3U file via `writeM3UPlaylist()`
+7. Record to database via `createSmartPlaylist()` and `recordPlaylistHistory()`
+
+**Update Flow:**
+
+1. Load playlist definition from database via `getSmartPlaylist()`
+2. Rebuild `PlaylistCreateOptions` from stored configuration
+3. Re-run `executePlaylistCreate()` with `force: true`
+4. Database is automatically updated via existing create logic
+
+### M3U File Format
+
+The `src/lib/m3u.ts` module handles M3U file I/O:
+
+**Write Format:**
+
+```
+#EXTM3U
+#EXTINF:180,Artist - Title
+/absolute/or/relative/path/to/file.flac
+#EXTINF:240,Artist - Another Title
+/absolute/or/relative/path/to/another.mp3
+```
+
+**Key Functions:**
+
+- `writeM3UPlaylist(options)` - Write M3U file with EXTINF metadata
+- `parseM3UPlaylist(filePath)` - Parse M3U file into `M3UTrackInfo[]`
+- `formatExtInf(track)` - Format `#EXTINF:duration,artist - title` line
+
+**Relative Path Handling:**
+
+When `relativePaths: true`, paths are computed relative to `baseDir`:
+
+```typescript
+if (relativePaths && baseDir) {
+  trackPath = relative(baseDir, track.filePath);
+}
+```
+
+### Configuration
+
+Smart playlists require library paths to be configured for filter-based sources:
+
+```yaml
+plex:
+  url: "http://localhost:32400"
+  token: "YOUR_PLEX_TOKEN" # or enroll: rfmedia plex auth login
+  allowedLibraryRoots:
+    - "/mnt/media/music"
+    - "/mnt/media/audiobooks"
+```
+
+Filter sources also require named filters in the config:
+
+```yaml
+filters:
+  favorites:
+    match: all
+    rules:
+      - type: rule
+        field: rating
+        operator: ">="
+        value: 0.8
+  rock:
+    match: all
+    rules:
+      - type: rule
+        field: genre
+        operator: contains
+        value: rock
+```
+
+### Key Patterns
+
+**Discriminated Union for Source Types:**
+
+The `PlaylistSource` type uses a discriminated union with `type` field for exhaustive switch handling:
+
+```typescript
+switch (source.type) {
+  case "filter":
+    // source is FilterPlaylistSource
+    loadNamedFilter(source.filterName);
+    break;
+  case "plex-playlist":
+    // source is PlexPlaylistSource
+    fetchPlexPlaylist(source.playlistName);
+    break;
+}
+```
+
+**Database Persistence for Update Support:**
+
+Playlist definitions are stored in SQLite to enable:
+
+- Re-generating playlists via `playlist update`
+- Tracking generation history for comparison
+- Batch updates via `playlist update --all`
+
+**Lazy Loading of Action Handlers:**
+
+Commands use dynamic imports for faster CLI startup:
+
+```typescript
+.action(async (name: string, options: Record<string, unknown>) => {
+  const { executePlaylistCreate } = await import("../actions/playlist.js");
+  await executePlaylistCreate({ name, ...options });
+});
+```
+
+## Disk Space Checking
+
+The CLI validates disk space before copy operations to prevent failures mid-copy.
+
+### Configuration
+
+Add to `.rfmedia.yaml`:
+
+```yaml
+copy:
+  diskSpaceMargin: 5
+  requireDiskSpace: false
+```
+
+### CLI Options
+
+- `--require-space` - Abort if insufficient disk space
+- `--no-require-space` - Skip disk space check entirely
+
+### Behavior
+
+| Mode                 | Behavior                                    |
+| -------------------- | ------------------------------------------- |
+| Default              | Warn if insufficient space, continue anyway |
+| `--require-space`    | Abort with `InsufficientSpaceError`         |
+| `--no-require-space` | Skip check entirely                         |
+| Hardlink mode        | Skip check (no additional space needed)     |
+| Dry-run mode         | Skip check (no actual copying)              |
+
+### Implementation
+
+The `src/lib/disk.ts` module provides:
+
+- `checkSufficientSpace(path, bytes, options)` - Check available space
+- `validateDiskSpace(path, bytes, options)` - Check and handle result
+- `estimateConvertedSize(bytes, format)` - Estimate output size for conversions
+- `formatBytes(bytes)` - Human-readable size formatting
+- `InsufficientSpaceError` - Custom error for abort mode
+
+### Conversion Size Estimation
+
+When using `--convert`, output sizes are estimated:
+
+| Format | Size Ratio     |
+| ------ | -------------- |
+| `alac` | 1.0 (lossless) |
+| `mp3`  | 0.25           |
+| `aac`  | 0.20           |
+| `opus` | 0.15           |
+
+## Per-Path Range and Count Support
+
+The copy command supports per-path suffixes when using file-based input, allowing different copy behaviors for each source path. Each path can specify either an explicit range or a count for auto-detection.
+
+### Input File Format
+
+When using `--file`, each line can include an optional suffix:
+
+```
+# Range format: explicit numbered copies
+/music/Artist1/Album1,001-003
+
+# Count format: auto-detect next N copies
+/music/Artist2/Album2,5
+
+# No suffix: uses CLI or config default
+/music/Artist3/Album3
+```
+
+**Detection Logic:**
+
+| Suffix                | Detected As  | Behavior                                                          |
+| --------------------- | ------------ | ----------------------------------------------------------------- |
+| Contains hyphen (`-`) | Range        | Creates explicit copies (e.g., `001-003` creates 001, 002, 003)   |
+| Pure digits only      | Count        | Auto-detects next N copies based on existing suffixes             |
+| Invalid format        | Part of path | Treats suffix as part of the path (e.g., `/path,abc` stays as-is) |
+
+The format uses the last comma as a delimiter. Paths containing commas are handled correctly.
+
+### Range Precedence
+
+Ranges are resolved with the following priority (highest to lowest):
+
+1. **CLI `--range` option** - Overrides all per-path ranges/counts and config
+2. **CLI `--count` option** - Auto-detects range based on existing suffixes (per-source)
+3. **Per-path count** - Count suffix in input file (e.g., `path,5`)
+4. **Per-path range** - Range suffix in input file (e.g., `path,001-003`)
+5. **Config `copy.range`** - Default range from `.rfmedia.json`
+
+**Note:** `--range` and `--count` are mutually exclusive (enforced via Commander.js `.conflicts('range')`). When `--count` is used, the effective range is computed independently for each source path based on existing numbered directories in the destination.
+
+### Configuration
+
+Add a default range to `.rfmedia.yaml`:
+
+```yaml
+copy:
+  range: "001-005"
+```
+
+This serves as a fallback when neither CLI `--range` nor per-path range is specified.
+
+### Implementation Details
+
+Key files for this feature:
+
+- `src/types/options.ts` - `PathEntry` interface with path, optional range, and optional count
+- `src/lib/input-file.ts` - `readSourcePaths()` returns `PathEntry[]`, parses ranges and counts
+- `src/lib/range.ts` - `isValidRange()`, `tryParseRange()`, `RANGE_PATTERN` exports
+- `src/types/config.ts` - `CopyConfigOptions.range` string field
+- `src/lib/config.ts` - `validateRangeString()` for config validation
+- `src/commands/copy.ts` - Mode detection and option building with range precedence
+- `src/actions/copy-album.ts` - Processes `PathEntry[]` with per-path ranges
+- `src/actions/copy-filter.ts` - Processes `PathEntry[]` with per-path ranges
+
+### Usage Examples
+
+```bash
+# Per-path ranges from file (each path uses its own range)
+rfmedia copy --file=paths.txt /dest
+
+# CLI range overrides all per-path ranges
+rfmedia copy --file=paths.txt /dest --range=001-010
+
+# Config range used as fallback for paths without explicit ranges
+# (assuming .rfmedia.json has copy.range set)
+rfmedia copy --file=paths.txt /dest
+```
+
+## Auto-Range Generation (`--count`)
+
+The `--count` option enables automatic range detection, allowing users to specify how many copies to create without knowing the current state of the destination directory. This is particularly useful for incremental operations where existing copies should be preserved.
+
+### CLI Option Definition
+
+Defined in `src/commands/copy.ts`:
+
+```typescript
+.addOption(
+  new Option('--count <N>', 'Number of copies to create (auto-detects next range)')
+    .argParser(parseIntArg)
+    .conflicts('range')
+)
+```
+
+**Key characteristics:**
+
+- Mutually exclusive with `--range` (enforced via `.conflicts('range')`)
+- Parsed as integer with validation (`count >= 1`)
+- Stored in `CopyOptions.count` as `number | undefined`
+
+### Auto-Range Detection Algorithm
+
+The detection logic is implemented in `src/lib/range.ts` with three core functions:
+
+**1. `detectHighestSuffix(destDir)` - Scans for existing numbered directories:**
+
+```typescript
+export async function detectHighestSuffix(
+  destDir: string,
+): Promise<{ highestSuffix: number; padWidth: number } | null> {
+  const entries = await readdir(destDir, { withFileTypes: true });
+
+  // Pattern matches: anything ending with -XXX where XXX is 3+ digits
+  const suffixPattern = /^(.+)-(\d{3,})$/;
+
+  let highestSuffix = -1;
+  let padWidth = 3; // Default padding width
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+
+    const match = entry.name.match(suffixPattern);
+    if (!match || !match[2]) continue;
+
+    const suffixStr = match[2];
+    const suffixNum = parseInt(suffixStr, 10);
+
+    if (suffixNum > highestSuffix) {
+      highestSuffix = suffixNum;
+      padWidth = suffixStr.length;
+    }
+  }
+
+  return highestSuffix === -1 ? null : { highestSuffix, padWidth };
+}
+```
+
+**Detection behavior:**
+
+- Scans only directories (not files)
+- Matches pattern `*-XXX` where XXX is 3+ digits (e.g., `Album-001`, `Album-042`)
+- Preserves detected padding width for consistency
+- Returns `null` if no numbered directories found (destination empty or non-existent)
+- Handles `ENOENT` gracefully (non-existent directory treated as empty)
+
+**2. `buildAutoRange(count, highestSuffix, padWidth)` - Constructs the CopyRange:**
+
+```typescript
+export function buildAutoRange(count: number, highestSuffix: number, padWidth: number): CopyRange {
+  return {
+    start: highestSuffix + 1,
+    end: highestSuffix + count,
+    padWidth,
+  };
+}
+```
+
+**3. `formatRange(range)` - Formats range for logging:**
+
+```typescript
+export function formatRange(range: CopyRange): string {
+  return `${formatSuffix(range.start, range.padWidth)}-${formatSuffix(range.end, range.padWidth)}`;
+}
+// Example: { start: 6, end: 8, padWidth: 3 } -> "006-008"
+```
+
+### Per-Source Detection in Action Handlers
+
+The auto-range detection is performed **per-source** in both `copy-album.ts` and `copy-filter.ts`. This enables different sources to start at different ranges based on their individual destination states.
+
+**Album Mode (`src/actions/copy-album.ts`, lines 1089-1101):**
+
+```typescript
+} else if (options.count !== undefined) {
+  // Auto-detect range for this source
+  const artistName = options.albumOnly
+    ? path.basename(path.dirname(sourcePath))
+    : path.basename(sourcePath);
+  const destArtistDir = path.join(destination, artistName);
+
+  const detection = await detectHighestSuffix(destArtistDir);
+  const highestSuffix = detection?.highestSuffix ?? 0;
+  const padWidth = detection?.padWidth ?? 3;
+
+  effectiveRange = buildAutoRange(options.count, highestSuffix, padWidth);
+  logInfo(`Auto-detected range for ${sourcePath}: ${formatRange(effectiveRange)}`);
+}
+```
+
+**Filter Mode (`src/actions/copy-filter.ts`, lines 2021-2047):**
+
+```typescript
+} else if (options.count !== undefined) {
+  // Auto-detect range for this source
+  const ratingFilter = options.mode.type === 'filter' ? options.mode.rating : undefined;
+  if (!ratingFilter) {
+    throw new Error('Invalid mode: expected filter mode');
+  }
+
+  // Determine destination directory based on filter mode settings
+  let destDir: string;
+  if (ratingFilter.albumMode) {
+    // Album mode: artist folder in destination
+    const artistName = options.albumOnly
+      ? path.basename(path.dirname(sourcePath))
+      : path.basename(sourcePath);
+    destDir = path.join(destination, artistName);
+  } else {
+    // Flat mode: output folder directly in destination
+    destDir = destination;
+  }
+
+  const detection = await detectHighestSuffix(destDir);
+  const highestSuffix = detection?.highestSuffix ?? 0;
+  const padWidth = detection?.padWidth ?? 3;
+
+  effectiveRange = buildAutoRange(options.count, highestSuffix, padWidth);
+  logInfo(`Auto-detected range for ${sourcePath}: ${formatRange(effectiveRange)}`);
+}
+```
+
+**Filter mode destination logic:**
+
+| Filter Setting     | Destination Directory                                      |
+| ------------------ | ---------------------------------------------------------- |
+| `albumMode: true`  | `destination/ArtistName/` (scans for `Album-XXX` patterns) |
+| `albumMode: false` | `destination/` (scans for `liked-songs-XXX` patterns)      |
+
+### Validation
+
+Count validation occurs in `buildCopyOptions()` (`src/commands/copy.ts`, lines 264-269):
+
+```typescript
+if (rawOptions.count !== undefined) {
+  if (rawOptions.count < 1) {
+    throw new Error(`--count must be at least 1, got ${rawOptions.count}`);
+  }
+  logDebug(`Auto-range mode with count: ${rawOptions.count}`);
+}
+```
+
+### Usage Examples
+
+```bash
+# Create 5 copies starting from the next available suffix
+rfmedia copy /music/Artist /dest --count=5
+# If Album-001 through Album-003 exist, creates Album-004 through Album-008
+
+# With file input (each source detects its own range)
+rfmedia copy --file=sources.txt /dest --count=3
+# Source 1 might create 001-003, Source 2 might create 007-009
+
+# Filter mode with album structure
+rfmedia copy /music/Artist /dest --min-stars=4 --album-mode --count=2
+# Creates liked tracks in numbered album folders
+
+# Filter mode flat structure
+rfmedia copy /music/Artist /dest --min-stars=4 --count=3
+# Creates liked-songs-001, liked-songs-002, liked-songs-003 (or continues from existing)
+```
+
+### Type Definition
+
+From `src/types/options.ts`:
+
+```typescript
+interface CopyOptions {
+  // ... other fields ...
+  /**
+   * Number of copies to create with auto-detected range.
+   * Mutually exclusive with cliRange - converted to range internally.
+   */
+  count?: number;
+}
+```
+
+### Implementation Files
+
+| File                         | Responsibility                                                        |
+| ---------------------------- | --------------------------------------------------------------------- |
+| `src/commands/copy.ts`       | CLI option definition, validation, `hasAlbumModeOptions()` check      |
+| `src/lib/range.ts`           | `detectHighestSuffix()`, `buildAutoRange()`, `formatRange()`          |
+| `src/actions/copy-album.ts`  | Per-source range detection for album mode                             |
+| `src/actions/copy-filter.ts` | Per-source range detection for filter mode (flat and album sub-modes) |
+| `src/types/options.ts`       | `CopyOptions.count` type definition                                   |
+
+## Undo/History System
+
+The CLI records all filesystem operations for undo support. Phase 2.5 introduced SQLite database storage as the default backend, with JSONL files available as legacy mode.
+
+### Architecture Overview (Phase 2.5)
+
+The undo/history system uses a **dual-mode routing pattern** that supports both:
+
+1. **Database mode** (default) - Sessions and operations stored in SQLite
+2. **Legacy mode** - Sessions stored as JSONL files in `~/.rfmedia/history/`
+
+**Mode selection** is determined by `undo.useLegacy` configuration:
+
+```typescript
+// src/lib/config.ts, line 945
+export function shouldUseUndoLegacyMode(config: ConfigFile): boolean {
+  return config.undo?.useLegacy ?? false;
+}
+```
+
+### Configuration
+
+Add to `.rfmedia.yaml`:
+
+```yaml
+undo:
+  enabled: true
+  retentionDays: 30
+  maxSizeMB: 100
+  historyPath: null
+  database: "~/.rfmedia/tracking.db"
+  useLegacy: false
+```
+
+| Option          | Type    | Default                  | Description                                  |
+| --------------- | ------- | ------------------------ | -------------------------------------------- |
+| `enabled`       | boolean | `true`                   | Enable operation history logging             |
+| `retentionDays` | number  | `30`                     | History retention in days                    |
+| `maxSizeMB`     | number  | `100`                    | Maximum history directory size in MB         |
+| `historyPath`   | string  | `~/.rfmedia/history`     | Custom JSONL history directory (legacy mode) |
+| `database`      | string  | `~/.rfmedia/tracking.db` | SQLite database path (database mode)         |
+| `useLegacy`     | boolean | `false`                  | Use JSONL files instead of database          |
+
+**Database path resolution** (`src/lib/config.ts`, lines 924-937):
+
+```typescript
+export function resolveUndoDatabasePath(config: ConfigFile): string {
+  // Priority 1: undo.database
+  if (config.undo?.database) {
+    return expandPath(config.undo.database);
+  }
+  // Priority 2: tracking.database (shared database)
+  if (config.tracking?.database) {
+    return expandPath(config.tracking.database);
+  }
+  // Priority 3: Default path
+  return join(homedir(), ".rfmedia", "tracking.db");
+}
+```
+
+### CLI Options
+
+- `rfmedia undo` - Undo the most recent operation
+- `rfmedia undo --last=N` - Undo the last N sessions
+- `rfmedia undo --list` - List undoable sessions
+- `rfmedia undo --session=<id>` - Undo a specific session
+
+### Database Schema: History Tables
+
+Located in `src/lib/schema.sql`, lines 99-131:
+
+**`history_sessions` table** - Replaces JSONL file headers:
+
+| Column            | Type    | Description                                              |
+| ----------------- | ------- | -------------------------------------------------------- |
+| `id`              | INTEGER | Primary key (auto-increment)                             |
+| `session_id`      | TEXT    | Unique session identifier: `{timestamp}-{command}-{pid}` |
+| `version`         | TEXT    | Format version (currently "1")                           |
+| `command`         | TEXT    | Command name: `copy`, `clean`, etc.                      |
+| `started_at`      | TEXT    | ISO timestamp                                            |
+| `ended_at`        | TEXT    | ISO timestamp (nullable, set on close)                   |
+| `status`          | TEXT    | `pending`, `undone`, or `partial`                        |
+| `cwd`             | TEXT    | Working directory                                        |
+| `operation_count` | INTEGER | Total operations (updated on close)                      |
+
+**`history_operations` table** - Replaces JSONL entries:
+
+| Column           | Type    | Description                                               |
+| ---------------- | ------- | --------------------------------------------------------- |
+| `id`             | INTEGER | Primary key (auto-increment)                              |
+| `session_id`     | INTEGER | FK to `history_sessions.id`                               |
+| `operation_type` | TEXT    | `copy`, `hardlink`, `convert`, `mkdir`, `remove`, `trash` |
+| `occurred_at`    | TEXT    | ISO timestamp                                             |
+| `source_path`    | TEXT    | Source file (nullable for mkdir/remove/trash)             |
+| `dest_path`      | TEXT    | Destination file/directory                                |
+| `created_dir`    | INTEGER | Boolean: 1 if mkdir created dir                           |
+| `convert_format` | TEXT    | Target format for convert ops                             |
+
+### HistoryRecorder Class (Dual-Mode)
+
+The `HistoryRecorder` class (`src/lib/history.ts`, lines 122-397) handles session-based operation logging with dual-mode routing:
+
+**Constructor** (lines 141-148):
+
+```typescript
+constructor(command: string, options?: { db?: DbConnection; dbSessionId?: number }) {
+  this.command = command;
+  this.sessionId = generateSessionId(command);
+  this.filePath = getSessionFilePath(this.sessionId);
+  this.enabled = isHistoryEnabled();
+  this.db = options?.db;
+  this.dbSessionId = options?.dbSessionId;
+}
+```
+
+**Recording operations** (lines 290-310):
+
+```typescript
+private async recordEntry(entry: HistoryEntry): Promise<void> {
+  if (!this.enabled || this.closed) return;
+
+  try {
+    // Database mode: route to database
+    if (this.db && this.dbSessionId !== undefined) {
+      this.recordEntryToDb(entry);
+      this.operationCount++;
+      return;
+    }
+    // Legacy mode: append to JSONL file
+    await appendFile(this.filePath, JSON.stringify(entry) + '\n', 'utf-8');
+    this.operationCount++;
+  } catch (err) { /* ... */ }
+}
+```
+
+### Session Lifecycle
+
+1. **Start session**: Copy actions call `createHistorySession(command, db?)` (`src/lib/history.ts`, lines 406-427)
+2. **Record operations**: `HistoryRecorder` methods (`recordCopy`, `recordHardlink`, `recordConvert`, `recordMkdir`, etc.)
+3. **Finish session**: `HistoryRecorder.close()` updates `ended_at` and `operation_count`
+
+**Database mode initialization in copy actions** (`src/actions/copy-album.ts`, lines 831-843):
+
+```typescript
+const config = getLoadedConfig();
+const trackingUseLegacy = config?.tracking?.useLegacy ?? false;
+const undoUseLegacy = shouldUseUndoLegacyMode(config);
+let db: DbConnection | undefined;
+
+// Initialize database if either tracking or undo need it
+const needsDb = (!trackingUseLegacy || !undoUseLegacy) && !options.dryRun;
+if (needsDb) {
+  const dbPath = resolveUndoDatabasePath(config);
+  db = await initializeDatabase(dbPath);
+}
+```
+
+**Creating history session** (`src/actions/copy-album.ts`, lines 952-957):
+
+```typescript
+if (!options.dryRun && isHistoryEnabled()) {
+  const undoDb = undoUseLegacy ? undefined : db;
+  recorder = await createHistorySession("copy", undoDb);
+  logDebug(`History session started: ${recorder.getId()}`);
+}
+```
+
+### Dual-Mode API Functions
+
+All history API functions support both database and legacy modes:
+
+| Function                               | File           | Database Mode      | Legacy Mode           |
+| -------------------------------------- | -------------- | ------------------ | --------------------- |
+| `createHistorySession(cmd, db?)`       | history.ts:406 | Creates DB session | Creates JSONL file    |
+| `listSessions(opts?, db?)`             | history.ts:524 | Queries DB         | Parses JSONL headers  |
+| `loadSession(id, db?)`                 | history.ts:630 | Loads from DB      | Reads full JSONL      |
+| `updateSessionStatus(id, status, db?)` | history.ts:693 | Updates DB         | Rewrites JSONL header |
+
+### Legacy History File Format
+
+Sessions stored as JSONL files in `~/.rfmedia/history/`:
+
+```
+{ISO-timestamp}-{command}-{pid}.jsonl
+```
+
+Each file contains a header line followed by operation entries:
+
+```jsonl
+{"_header":true,"version":"1","command":"copy","startedAt":"...","status":"pending","cwd":"/path"}
+{"op":"copy","at":"...","src":"/source/file.flac","dest":"/dest/file.flac"}
+{"op":"mkdir","at":"...","dest":"/dest/album","created":true}
+```
+
+### Automatic Legacy Migration
+
+The `migrateLegacyHistory(db)` function (`src/lib/history.ts`, lines 810-904) migrates JSONL files to database:
+
+```typescript
+export async function autoMigrateHistoryIfNeeded(db: DbConnection): Promise<boolean> {
+  // Check for legacy JSONL files
+  const hasLegacyFiles = entries.some((e) => e.isFile() && e.name.endsWith(".jsonl"));
+  if (!hasLegacyFiles) return false;
+
+  // Check if database already has sessions
+  const existingSessions = getHistorySessions(db, { limit: 1 });
+  if (existingSessions.length > 0) return false; // Already migrated
+
+  logDebug("Detected legacy history files, running automatic migration...");
+  const result = await migrateLegacyHistory(db);
+  return true;
+}
+```
+
+### Key Type Definitions
+
+**DbHistorySession** (`src/types/db.ts`, lines 122-133):
+
+```typescript
+interface DbHistorySession {
+  id: number;
+  session_id: string;
+  version: string;
+  command: string;
+  started_at: string;
+  ended_at: string | null;
+  status: "pending" | "undone" | "partial";
+  cwd: string;
+  operation_count: number;
+}
+```
+
+**DbHistoryOperation** (`src/types/db.ts`, lines 137-147):
+
+```typescript
+interface DbHistoryOperation {
+  id: number;
+  session_id: number;
+  operation_type: "copy" | "hardlink" | "convert" | "mkdir" | "remove" | "trash";
+  occurred_at: string;
+  source_path: string | null;
+  dest_path: string;
+  created_dir: number;
+  convert_format: string | null;
+}
+```
+
+### Implementation Files
+
+| File                         | Responsibility                                              |
+| ---------------------------- | ----------------------------------------------------------- |
+| `src/lib/history.ts`         | HistoryRecorder class, dual-mode API functions              |
+| `src/lib/db.ts`              | Database CRUD for history_sessions/history_operations       |
+| `src/lib/schema.sql`         | Schema definition (lines 99-131)                            |
+| `src/lib/config.ts`          | `shouldUseUndoLegacyMode()`, `resolveUndoDatabasePath()`    |
+| `src/types/db.ts`            | `DbHistorySession`, `DbHistoryOperation`, params interfaces |
+| `src/types/history.ts`       | `HistoryEntry`, `HistorySession`, `HistorySessionHeader`    |
+| `src/commands/undo.ts`       | CLI command, initializes database for undo                  |
+| `src/actions/undo.ts`        | Undo execution logic                                        |
+| `src/actions/copy-album.ts`  | Initializes DB, creates history session (lines 831-957)     |
+| `src/actions/copy-filter.ts` | Initializes DB, creates history session (lines 1548-1629)   |
+
+## Tracking System Architecture
+
+The CLI includes a comprehensive tracking system for resumable operations, using SQLite as the primary backend with dual-mode support for backward compatibility.
+
+### Overview
+
+The tracking system provides:
+
+- Idempotent operation support (resume interrupted operations)
+- Option-aware tracking (different options create separate operation records)
+- Database-backed persistence with automatic legacy file migration
+- File inventory tracking for incremental sync operations
+
+### Dual-Mode Routing
+
+The tracking system supports two backends:
+
+| Mode                   | Backend       | Configuration               |
+| ---------------------- | ------------- | --------------------------- |
+| **Database** (default) | SQLite        | `tracking.useLegacy: false` |
+| **Legacy**             | Sidecar files | `tracking.useLegacy: true`  |
+
+**Routing logic in `src/lib/completed-tracker.ts`:**
+
+```typescript
+// Database mode: TrackingConfig has db and operationId
+if (config.db && config.operationId !== undefined) {
+  return loadTrackingStateFromDb(config.db, config.operationId);
+}
+// Legacy mode: falls through to file-based tracking
+```
+
+### Architecture Diagram
+
+The following diagram illustrates the complete tracking system flow with dual-mode routing:
+
+```mermaid
+flowchart TD
+    subgraph Entry["Entry Points"]
+        A1[copy-album.ts]
+        A2[copy-filter.ts]
+        A3[sync.ts]
+    end
+
+    subgraph Init["Initialization Phase"]
+        B1{useLegacy?}
+        B2[initializeDatabase]
+        B3[createTrackingConfig]
+        B4[initializeTracking]
+    end
+
+    subgraph DbInit["Database Initialization"]
+        C1[DbConnection]
+        C2[initializeTrackingInDb]
+        C3{findOperation<br/>exists?}
+        C4[Reuse existing<br/>operation ID]
+        C5[createOperation]
+        C6[Set config.operationId]
+        C7{Legacy files<br/>exist?}
+        C8[migrateLegacyTracking]
+    end
+
+    subgraph LegacyInit["Legacy Initialization"]
+        D1{reset flag?}
+        D2[Delete existing<br/>tracking files]
+        D3[Create .completed file<br/>with header]
+    end
+
+    subgraph Load["Load Tracking State"]
+        E1[loadTrackingState]
+        E2{config.db &&<br/>operationId?}
+        E3[loadTrackingStateFromDb]
+        E4[Load from<br/>.completed/.failed files]
+        E5[TrackingState<br/>completed Set + failed Set]
+    end
+
+    subgraph Process["Process Sources"]
+        F1[filterPendingSources]
+        F2[Process each source]
+        F3{Source<br/>succeeded?}
+    end
+
+    subgraph Record["Record Results"]
+        G1[recordCompleted]
+        G2{config.db &&<br/>operationId?}
+        G3[recordCompletedInDb]
+        G4[appendFile to<br/>.completed.txt]
+        G5[recordFailed]
+        G6{config.db &&<br/>operationId?}
+        G7[recordFailedInDb]
+        G8[appendFile to<br/>.failed.txt]
+    end
+
+    subgraph DbOps["Database Operations"]
+        H1[(operations)]
+        H2[(completed_sources)]
+        H3[(failed_sources)]
+        H4[(inventory)]
+    end
+
+    subgraph FileOps["Legacy File Operations"]
+        I1[.completed.hash.txt]
+        I2[.failed.hash.txt]
+        I3[.inventory.hash.jsonl]
+    end
+
+    %% Entry to Init
+    A1 --> B1
+    A2 --> B1
+    A3 --> B1
+
+    %% Config check
+    B1 -->|No| B2
+    B1 -->|Yes| B3
+    B2 --> C1
+    C1 --> B3
+    B3 --> B4
+
+    %% Database init path
+    B4 -->|db exists| C2
+    C2 --> C3
+    C3 -->|Yes| C4
+    C3 -->|No| C5
+    C4 --> C6
+    C5 --> H1
+    C5 --> C6
+    C6 --> C7
+    C7 -->|Yes| C8
+    C7 -->|No| E1
+    C8 --> H2
+    C8 --> H3
+    C8 --> E1
+
+    %% Legacy init path
+    B4 -->|no db| D1
+    D1 -->|Yes| D2
+    D1 -->|No| D3
+    D2 --> D3
+    D3 --> I1
+    D3 --> E1
+
+    %% Load state
+    E1 --> E2
+    E2 -->|Yes| E3
+    E2 -->|No| E4
+    E3 --> H2
+    E3 --> H3
+    E3 --> E5
+    E4 --> I1
+    E4 --> I2
+    E4 --> E5
+
+    %% Processing
+    E5 --> F1
+    F1 --> F2
+    F2 --> F3
+
+    %% Record completed
+    F3 -->|Yes| G1
+    G1 --> G2
+    G2 -->|Yes| G3
+    G2 -->|No| G4
+    G3 --> H2
+    G4 --> I1
+
+    %% Record failed
+    F3 -->|No| G5
+    G5 --> G6
+    G6 -->|Yes| G7
+    G6 -->|No| G8
+    G7 --> H3
+    G8 --> I2
+
+    %% Styling
+    classDef entry fill:#e1f5fe,stroke:#01579b
+    classDef decision fill:#fff3e0,stroke:#e65100
+    classDef dbop fill:#e8f5e9,stroke:#2e7d32
+    classDef fileop fill:#fce4ec,stroke:#880e4f
+    classDef process fill:#f3e5f5,stroke:#6a1b9a
+
+    class A1,A2,A3 entry
+    class B1,C3,C7,D1,E2,F3,G2,G6 decision
+    class H1,H2,H3,H4 dbop
+    class I1,I2,I3 fileop
+    class F1,F2 process
+```
+
+**Diagram Key:**
+
+| Color  | Meaning                         |
+| ------ | ------------------------------- |
+| Blue   | Entry points (action files)     |
+| Orange | Decision points (routing logic) |
+| Green  | Database tables                 |
+| Pink   | Legacy sidecar files            |
+| Purple | Processing operations           |
+
+**Flow Summary:**
+
+1. **Entry**: Actions (`copy-album.ts`, `copy-filter.ts`, `sync.ts`) start the tracking flow
+2. **Config Check**: `useLegacy` flag determines whether to initialize database
+3. **Database Mode**: Creates/finds operation, migrates legacy files if present
+4. **Legacy Mode**: Creates `.completed.{hash}.txt` sidecar file
+5. **Load State**: Routing reads from database or files based on config
+6. **Process**: Sources filtered by completed state, processed in parallel
+7. **Record**: Results routed to database `INSERT` or file `appendFile`
+
+### Configuration
+
+Add to `.rfmedia.yaml`:
+
+```yaml
+tracking:
+  useLegacy: false
+  database: "~/.rfmedia/tracking.db"
+```
+
+| Option      | Type    | Default                  | Description                                 |
+| ----------- | ------- | ------------------------ | ------------------------------------------- |
+| `useLegacy` | boolean | `false`                  | Use file-based tracking instead of database |
+| `database`  | string  | `~/.rfmedia/tracking.db` | Path to SQLite database                     |
+
+### Configuration Loading and Validation
+
+The tracking system behavior is controlled by configuration file settings. Understanding how configuration is loaded and validated is critical to avoid unexpected tracking behavior.
+
+**Config File Resolution Order:**
+
+1. Searches for `.rfmedia.yaml` / `.yml` / `.json` in the current working directory
+2. Searches up the directory tree
+3. Uses the first file found
+4. If no config file exists, uses built-in defaults
+
+**Default Values When No Config Exists:**
+
+```typescript
+{
+  trackCompleted: true,        // Tracking enabled by default
+  tracking: {
+    useLegacy: false,          // Database mode by default
+    database: "~/.rfmedia/tracking.db"
+  }
+}
+```
+
+**Verification Commands:**
+
+```bash
+# Check if tracking is enabled in config
+rfmedia copy --debug  # Shows loaded config path
+```
+
+### Tracking Identifier Logic
+
+The tracking system uses different identifiers based on input method:
+
+| Scenario         | Identifier       | Example                  |
+| ---------------- | ---------------- | ------------------------ |
+| With `--file`    | Input file path  | `/home/user/sources.txt` |
+| Without `--file` | Destination path | `/mnt/music/output`      |
+
+Both scenarios generate unique operation IDs in the database based on:
+
+- Input file or destination path
+- Options hash (mode, range, rating, convert format)
+- Command type
+
+### Database Schema
+
+Located in `src/lib/schema.sql`.
+
+**Analytics Query Usage**: The `rfmedia stats` and `rfmedia history` commands (Phase 5) query these tables for aggregated statistics and filtered history views. See the [Analytics Commands (Phase 5)](#analytics-commands-phase-5) section for specific SQL queries used.
+
+**`operations` table** - Tracks copy/sync operations (queried by `stats` and `history` commands):
+
+| Column            | Type    | Description                                       |
+| ----------------- | ------- | ------------------------------------------------- |
+| `id`              | INTEGER | Primary key (auto-increment)                      |
+| `created_at`      | TEXT    | ISO timestamp                                     |
+| `command`         | TEXT    | Command type: `copy-album`, `copy-filter`, `sync` |
+| `mode`            | TEXT    | Mode: `album` or `filter`                         |
+| `input_file`      | TEXT    | Source file path (nullable for CLI args)          |
+| `options_hash`    | TEXT    | e.g., `album-001-010`, `filter-r80-mp3`           |
+| `rating_key`      | TEXT    | e.g., `r80`, `s3` (nullable)                      |
+| `range_key`       | TEXT    | e.g., `001-010` (nullable)                        |
+| `convert_key`     | TEXT    | e.g., `mp3`, `alac` (nullable)                    |
+| `status`          | TEXT    | `pending`, `completed`, `failed`, `partial`       |
+| `total_sources`   | INTEGER | Total sources to process                          |
+| `completed_count` | INTEGER | Successfully processed count                      |
+| `failed_count`    | INTEGER | Failed source count                               |
+| `started_at`      | TEXT    | ISO timestamp                                     |
+| `ended_at`        | TEXT    | ISO timestamp (nullable)                          |
+
+**`completed_sources` table** - Tracks completed source paths (queried by `history --show-duplicates`):
+
+| Column         | Type    | Description           |
+| -------------- | ------- | --------------------- |
+| `id`           | INTEGER | Primary key           |
+| `operation_id` | INTEGER | FK to operations.id   |
+| `source_path`  | TEXT    | Completed source path |
+| `completed_at` | TEXT    | ISO timestamp         |
+
+**`failed_sources` table** - Tracks failed operations:
+
+| Column          | Type    | Description         |
+| --------------- | ------- | ------------------- |
+| `id`            | INTEGER | Primary key         |
+| `operation_id`  | INTEGER | FK to operations.id |
+| `source_path`   | TEXT    | Failed source path  |
+| `error_message` | TEXT    | Error description   |
+| `failed_at`     | TEXT    | ISO timestamp       |
+
+**`inventory` table** - Tracks synced files (queried by `stats` for storage statistics):
+
+| Column          | Type    | Description                          |
+| --------------- | ------- | ------------------------------------ |
+| `id`            | INTEGER | Primary key                          |
+| `operation_id`  | INTEGER | FK to operations.id                  |
+| `source_path`   | TEXT    | Source directory                     |
+| `relative_path` | TEXT    | File path relative to source         |
+| `mtime`         | INTEGER | Modification time (epoch ms)         |
+| `size`          | INTEGER | File size in bytes                   |
+| `rating`        | REAL    | Normalized rating 0.0-1.0 (nullable) |
+| `dest_path`     | TEXT    | Absolute destination path            |
+| `copied_at`     | INTEGER | Timestamp when copied (epoch ms)     |
+
+**`history_sessions` table** - Phase 2.5 undo/history sessions (lines 99-115):
+
+| Column            | Type    | Description                                      |
+| ----------------- | ------- | ------------------------------------------------ |
+| `id`              | INTEGER | Primary key (auto-increment)                     |
+| `session_id`      | TEXT    | Unique session ID: `{timestamp}-{command}-{pid}` |
+| `version`         | TEXT    | Format version (currently "1")                   |
+| `command`         | TEXT    | Command name: `copy`, `clean`, etc.              |
+| `started_at`      | TEXT    | ISO timestamp                                    |
+| `ended_at`        | TEXT    | ISO timestamp (nullable, set on close)           |
+| `status`          | TEXT    | `pending`, `undone`, or `partial`                |
+| `cwd`             | TEXT    | Working directory                                |
+| `operation_count` | INTEGER | Total operations (updated on close)              |
+
+**`history_operations` table** - Phase 2.5 undo/history operations (lines 117-131):
+
+| Column           | Type    | Description                                               |
+| ---------------- | ------- | --------------------------------------------------------- |
+| `id`             | INTEGER | Primary key (auto-increment)                              |
+| `session_id`     | INTEGER | FK to `history_sessions.id`                               |
+| `operation_type` | TEXT    | `copy`, `hardlink`, `convert`, `mkdir`, `remove`, `trash` |
+| `occurred_at`    | TEXT    | ISO timestamp                                             |
+| `source_path`    | TEXT    | Source file (nullable for mkdir/remove/trash)             |
+| `dest_path`      | TEXT    | Destination file/directory                                |
+| `created_dir`    | INTEGER | Boolean: 1 if mkdir created dir                           |
+| `convert_format` | TEXT    | Target format for convert ops                             |
+
+### Key Files
+
+| File                           | Responsibility                                                                |
+| ------------------------------ | ----------------------------------------------------------------------------- |
+| `src/lib/db.ts`                | Database initialization, connection management, CRUD operations               |
+| `src/lib/schema.sql`           | SQLite schema definition (tracking + history tables)                          |
+| `src/lib/completed-tracker.ts` | Tracking routing logic between database and legacy modes                      |
+| `src/lib/history.ts`           | HistoryRecorder class, dual-mode undo/history API                             |
+| `src/lib/inventory.ts`         | Inventory routing with `InventoryContext`                                     |
+| `src/lib/config.ts`            | `shouldUseUndoLegacyMode()`, `resolveUndoDatabasePath()` (lines 924-947)      |
+| `src/types/db.ts`              | `DbConnection`, `DbOperation`, `DbHistorySession`, `DbHistoryOperation` types |
+| `src/types/tracking.ts`        | `TrackingConfig` with `db` and `operationId` fields                           |
+| `src/types/history.ts`         | `HistoryEntry`, `HistorySession`, `HistorySessionHeader` types                |
+| `src/types/inventory.ts`       | `InventoryContext` interface                                                  |
+| `src/commands/stats.ts`        | Stats CLI interface with console formatting                                   |
+| `src/commands/history.ts`      | History CLI interface with console formatting                                 |
+| `src/actions/stats.ts`         | Statistics query implementation                                               |
+| `src/actions/history.ts`       | History query with date parsing and filtering                                 |
+| `src/actions/stats.test.ts`    | Stats action tests                                                            |
+| `src/actions/history.test.ts`  | History action tests                                                          |
+
+### Options Hash Format
+
+The options hash creates unique identifiers for different option combinations:
+
+```
+{mode}-{rating?}-{range?}-{convert?}
+```
+
+**Examples:**
+
+- Album mode with range: `album-001-010`
+- Filter mode with rating: `filter-r80`
+- Filter mode with rating and conversion: `filter-s3-001-005-mp3`
+
+### Automatic Legacy Migration
+
+When using database mode, legacy tracking files are automatically imported:
+
+1. On `initializeTracking()`, the system checks for legacy files:
+   - `.completed.{hash}.txt` files
+   - `.failed.{hash}.txt` files
+2. If found, entries are imported into the database operation
+3. Legacy files are **NOT deleted** after migration (manual cleanup required)
+4. Migration happens transparently during first database run
+
+**Migration flow:**
+
+```typescript
+// In initializeTracking()
+if (hasCompleted || hasFailed) {
+  logInfo("Detected legacy tracking files, migrating to database...");
+  await migrateLegacyTracking(db, operationId, completedPath, failedPath);
+}
+```
+
+### Usage Examples
+
+```bash
+# Database mode (default) - tracking persists to SQLite
+rfmedia copy --file=sources.txt /dest --range=001-005
+
+# Resume interrupted operation (same options = same operation ID)
+rfmedia copy --file=sources.txt /dest --range=001-005
+
+# Reset tracking (creates new operation)
+rfmedia copy --file=sources.txt /dest --range=001-005 --reset
+
+# View tracking stats
+rfmedia copy --file=sources.txt /dest --range=001-005 --dry-run
+```
+
+### InventoryContext Pattern
+
+The `InventoryContext` interface enables routing for inventory operations:
+
+```typescript
+interface InventoryContext {
+  inventoryPath: string; // Legacy file path
+  db?: DbConnection; // Database connection (optional)
+  operationId?: number; // Operation ID (optional)
+}
+
+// Usage in inventory functions
+async function loadInventory(context: InventoryContext): Promise<LoadedInventory> {
+  if (context.db && context.operationId !== undefined) {
+    return loadInventoryFromDb(context.db, context.operationId);
+  }
+  // Fall through to legacy file-based loading
+}
+```
+
+### TrackingConfig Pattern
+
+The `TrackingConfig` interface includes optional database fields:
+
+```typescript
+interface TrackingConfig {
+  enabled: boolean;
+  completedFilePath: string; // Legacy file path
+  failedFilePath: string; // Legacy file path
+  reset: boolean;
+  db?: DbConnection; // Database mode
+  operationId?: number; // Database mode
+}
+```
+
+### Granular Tracking System
+
+The granular tracking system enables **range expansion**: if suffixes 001-002 were previously completed, running with 001-020 will only process 003-020 instead of skipping the entire source. This is critical for large operations where users may want to expand their range after initial processing.
+
+#### When Granular Tracking Activates
+
+Granular tracking activates when **all** of the following conditions are met:
+
+1. Database mode is active (`trackingConfig.db` exists)
+2. Operation ID is assigned (`trackingConfig.operationId !== undefined`)
+3. Copy mode is `filter` (`options.mode.type === 'filter'`)
+4. A range is present from any source:
+   - CLI `--range` option (`options.cliRange`)
+   - Per-path range in input file (`entry.range`)
+   - Config default range (`options.configRange`)
+
+**Code reference** (`copy-filter.ts`, lines 1393-1399):
+
+```typescript
+const useGranularCheck =
+  trackingConfig.db &&
+  trackingConfig.operationId !== undefined &&
+  options.mode.type === "filter" &&
+  (options.cliRange !== undefined ||
+    sourceEntries.some((e) => e.range !== undefined) ||
+    options.configRange !== undefined);
+```
+
+When granular tracking is not active, the system falls back to **standard source-level tracking** where the entire source path is marked complete/incomplete.
+
+#### Database Schema: `completed_album_copies` Table
+
+The granular tracking state is stored in the `completed_album_copies` table:
+
+| Column         | Type    | Description                                 |
+| -------------- | ------- | ------------------------------------------- |
+| `id`           | INTEGER | Primary key                                 |
+| `operation_id` | INTEGER | FK to operations.id                         |
+| `source_path`  | TEXT    | Source album directory                      |
+| `album_name`   | TEXT    | Album folder name (basename)                |
+| `suffix`       | TEXT    | Completed suffix (e.g., '001', '002')       |
+| `rating_key`   | TEXT    | Rating filter key for rating-aware tracking |
+| `completed_at` | TEXT    | ISO timestamp                               |
+
+**Unique constraint**: `(operation_id, source_path, album_name, suffix, rating_key)`
+
+This enables different rating filters (e.g., `r50` vs `r80`) to maintain separate tracking states.
+
+#### AlbumTrackingContext Interface
+
+The `AlbumTrackingContext` interface passes granular tracking state through the copy pipeline:
+
+```typescript
+interface AlbumTrackingContext {
+  config: TrackingConfig;
+  sourcePath: string;
+  completedAlbumCopies: Map<string, Set<string>>; // albumName -> Set<suffix>
+  ratingKey?: string | null;
+}
+```
+
+**Initialization** (`copy-filter.ts`, lines 1139-1151):
+
+```typescript
+let trackingContext: AlbumTrackingContext | undefined;
+if (trackingConfig?.db && trackingConfig.operationId !== undefined && !dryRun && filter.range) {
+  const optionsHash = buildOptionsHash(options);
+  const ratingKey = optionsHash.ratingKey ?? null;
+
+  const completedAlbumCopies = loadCompletedAlbumCopiesForSource(
+    trackingConfig.db,
+    trackingConfig.operationId,
+    source,
+    ratingKey,
+  );
+  // ... build context
+}
+```
+
+#### Critical Implementation Details and Bug Fixes
+
+**1. firstCopyPaths Population for Completed First Suffix**
+
+When the first suffix is already completed (from a previous run), the system must still populate `firstCopyPaths` so subsequent suffix copies can hardlink from the existing files instead of re-copying from source.
+
+**Code reference** (`copy-filter.ts`, lines 561-576):
+
+```typescript
+if (firstSuffixCompleted) {
+  logDebug(`  Skipping tracked completed suffix: ${albumName}-${firstSuffix}`);
+  // Populate firstCopyPaths from existing completed directory
+  for (const trackPath of tracks) {
+    const originalFilename = path.basename(trackPath);
+    const destFilename = getDestFilename(originalFilename, convertFormat);
+    const destPath = path.join(firstAlbumDest, destFilename);
+
+    if (await pathExists(destPath)) {
+      firstCopyPaths.set(originalFilename, destPath);
+    }
+  }
+  logDebug(`  Loaded ${firstCopyPaths.size} files from existing first copy: ${firstAlbumDest}`);
+}
+```
+
+**Why this matters**: Without this, range expansion (e.g., running 001-020 after completing 001-002) would fail because:
+
+- The first suffix (001) would be skipped as completed
+- `firstCopyPaths` would be empty
+- Subsequent suffixes (003-020) couldn't find files to hardlink from
+
+**2. Source-Level Completion Prevention in Granular Mode**
+
+When using granular tracking, the system must NOT mark the source path as completed at the source level. This prevents the entire source from being skipped on subsequent runs with expanded ranges.
+
+**Code reference** (`copy-filter.ts`, lines 1677-1690):
+
+```typescript
+const usingGranularTracking =
+  trackingConfig.db && trackingConfig.operationId !== undefined && effectiveRange !== undefined;
+
+if (!usingGranularTracking) {
+  // Standard source-level tracking
+  await recordCompleted(trackingConfig, sourcePath);
+} else {
+  // Granular tracking mode - only per-suffix tracking
+  // Do NOT mark source complete
+  logDebug(`Skipping source-level completion for ${sourcePath} (using granular tracking)`);
+}
+```
+
+**Why this matters**: If the source were marked complete at the source level after processing suffixes 001-002, a subsequent run with range 001-020 would skip the entire source before granular suffix filtering could occur.
+
+#### Range Expansion Flow
+
+**Example scenario**: User runs `--range=001-002`, completes successfully, then runs `--range=001-020`.
+
+1. **filterSourcesWithRangeAwareness()** checks if source has pending work
+2. **hasSourcePendingWorkForRange()** queries `completed_album_copies` for this operation/source
+3. Finds suffixes 001-002 completed, 003-020 pending
+4. Source is included in `pending` list (not skipped)
+5. During processing, **processAlbumMode()** receives `trackingContext` with completed suffixes
+6. For each album:
+   - First suffix (001) is skipped, but `firstCopyPaths` populated from existing files
+   - Remaining suffixes (002 skipped, 003-020 processed) use hardlinks from `firstCopyPaths`
+   - Each completed suffix recorded via `recordCompletedAlbumCopy()`
+7. Source-level completion is NOT recorded (granular mode active)
+
+#### Related Functions
+
+| Function                              | File                | Purpose                                     |
+| ------------------------------------- | ------------------- | ------------------------------------------- |
+| `filterSourcesWithRangeAwareness()`   | copy-filter.ts:1383 | Route to granular vs standard filtering     |
+| `hasSourcePendingWorkForRange()`      | db.ts               | Check if any suffixes pending for range     |
+| `loadCompletedAlbumCopiesForSource()` | db.ts               | Load Map<albumName, Set<suffix>>            |
+| `recordCompletedAlbumCopy()`          | db.ts:317           | Insert into completed_album_copies          |
+| `processAlbumMode()`                  | copy-filter.ts:357  | Core album processing with tracking context |
+
+### Analytics Commands (Phase 5)
+
+Phase 5 introduces analytics commands that query the tracking database to provide operation statistics, storage usage analysis, and filtered history views. These commands support both console output and JSON output for scripting.
+
+#### Stats Command
+
+The `rfmedia stats` command queries the tracking database for aggregated operation statistics and storage usage.
+
+**Command Syntax:**
+
+```bash
+rfmedia stats [options]
+```
+
+**CLI Options:**
+
+| Option                       | Description                                         |
+| ---------------------------- | --------------------------------------------------- |
+| `--tracking-database <path>` | Path to SQLite tracking database (overrides config) |
+
+**What It Provides:**
+
+- Operation statistics grouped by command type (copy-album, copy-filter, sync)
+- Success rates by mode (album vs filter)
+- Total file count and storage size from inventory
+- Storage breakdown by rating ranges (4-5 stars, 3-4 stars, etc.)
+
+**Database Queries:**
+
+The stats command performs four primary queries:
+
+1. **Operation Statistics** (`queryOperationStats`):
+
+```sql
+SELECT
+  command,
+  COUNT(*) as total,
+  SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
+  SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed,
+  SUM(CASE WHEN status = 'partial' THEN 1 ELSE 0 END) as partial
+FROM operations
+GROUP BY command
+ORDER BY total DESC
+```
+
+2. **Success Rate by Mode** (`querySuccessRateByMode`):
+
+```sql
+SELECT
+  mode,
+  COUNT(*) as total,
+  AVG(CASE WHEN status = 'completed' THEN 1.0 ELSE 0.0 END) * 100 as success_rate
+FROM operations
+WHERE mode IS NOT NULL
+GROUP BY mode
+```
+
+3. **Total Storage** (`queryTotalStorage`):
+
+```sql
+SELECT
+  COUNT(*) as total_files,
+  COALESCE(SUM(size), 0) as total_size
+FROM inventory
+```
+
+4. **Storage by Rating** (`queryStorageByRating`):
+
+```sql
+SELECT
+  CASE
+    WHEN rating >= 0.8 THEN '4-5 stars'
+    WHEN rating >= 0.6 THEN '3-4 stars'
+    WHEN rating >= 0.4 THEN '2-3 stars'
+    WHEN rating >= 0.2 THEN '1-2 stars'
+    ELSE 'Unrated'
+  END as rating_range,
+  COUNT(*) as file_count,
+  COALESCE(SUM(size), 0) as total_size
+FROM inventory
+GROUP BY rating_range
+```
+
+**Usage Examples:**
+
+```bash
+# Show operation statistics with default database
+rfmedia stats
+
+# Use custom database path
+rfmedia stats --tracking-database=/custom/path/tracking.db
+
+# JSON output for scripting
+rfmedia stats --json
+```
+
+**JSON Output Format:**
+
+```json
+{
+  "command": "stats",
+  "result": {
+    "operations": [
+      {
+        "command": "copy-album",
+        "total": 10,
+        "completed": 8,
+        "failed": 1,
+        "partial": 1,
+        "successRate": 80.0
+      }
+    ],
+    "totalFiles": 1500,
+    "totalSize": 15000000000,
+    "storageByRating": [
+      { "range": "4-5 stars", "fileCount": 500, "totalSize": 5000000000 },
+      { "range": "3-4 stars", "fileCount": 400, "totalSize": 4000000000 }
+    ],
+    "successRateByMode": { "album": 85.0, "filter": 75.0 }
+  }
+}
+```
+
+#### History Command
+
+The `rfmedia history` command queries operation history with advanced filtering and duplicate detection.
+
+**Command Syntax:**
+
+```bash
+rfmedia history [options]
+```
+
+**CLI Options:**
+
+| Option                       | Description                                                   |
+| ---------------------------- | ------------------------------------------------------------- |
+| `--from <date>`              | Start date (ISO format or relative like "7 days ago")         |
+| `--to <date>`                | End date (ISO format or relative)                             |
+| `--mode <type>`              | Filter by copy mode: `album` or `filter`                      |
+| `--status <status>`          | Filter by status: `pending`, `completed`, `failed`, `partial` |
+| `--command <command>`        | Filter by command: `copy-album`, `copy-filter`, `sync`        |
+| `-l, --limit <number>`       | Maximum results (default: 50)                                 |
+| `--show-duplicates`          | Highlight duplicate operations and sources                    |
+| `--tracking-database <path>` | Path to SQLite tracking database (overrides config)           |
+
+**Date Parsing Logic:**
+
+The `parseDate()` function supports two formats:
+
+1. **ISO Format**: Standard ISO 8601 dates (`2026-01-15`, `2026-01-15T10:30:00`)
+2. **Relative Format**: Natural language relative dates with pattern `/^(\d+)\s+(days?|weeks?|months?)\s+ago$/i`
+
+**Examples:**
+
+- `7 days ago` - Subtracts 7 days from current date
+- `2 weeks ago` - Subtracts 14 days from current date
+- `1 month ago` - Subtracts 1 month from current date
+
+**Date Parsing Implementation:**
+
+```typescript
+function parseDate(dateStr: string): string {
+  // Try ISO date parsing first
+  const isoDate = new Date(dateStr);
+  if (!isNaN(isoDate.getTime())) {
+    return isoDate.toISOString();
+  }
+
+  // Try relative date parsing
+  const relativePattern = /^(\d+)\s+(days?|weeks?|months?)\s+ago$/i;
+  const match = dateStr.match(relativePattern);
+
+  if (!match || !match[1] || !match[2]) {
+    throw new Error(`Invalid date format: "${dateStr}"`);
+  }
+
+  const amount = parseInt(match[1], 10);
+  const unit = match[2].toLowerCase();
+  const now = new Date();
+
+  if (unit.startsWith("day")) {
+    now.setDate(now.getDate() - amount);
+  } else if (unit.startsWith("week")) {
+    now.setDate(now.getDate() - amount * 7);
+  } else if (unit.startsWith("month")) {
+    now.setMonth(now.getMonth() - amount);
+  }
+
+  return now.toISOString();
+}
+```
+
+**Duplicate Detection:**
+
+When `--show-duplicates` is enabled, the command detects two types of duplicates:
+
+1. **Duplicate Operations** - Operations sharing the same `options_hash`:
+
+```sql
+SELECT
+  options_hash,
+  COUNT(*) as duplicate_count,
+  GROUP_CONCAT(id) as operation_ids
+FROM operations
+WHERE options_hash IS NOT NULL
+GROUP BY options_hash
+HAVING COUNT(*) > 1
+ORDER BY duplicate_count DESC
+```
+
+2. **Duplicate Sources** - Source paths processed in multiple operations:
+
+```sql
+SELECT
+  source_path,
+  COUNT(DISTINCT operation_id) as operation_count
+FROM completed_sources
+GROUP BY source_path
+HAVING COUNT(DISTINCT operation_id) > 1
+ORDER BY operation_count DESC
+```
+
+**Usage Examples:**
+
+```bash
+# Show last 50 operations
+rfmedia history
+
+# Filter by date range
+rfmedia history --from="2026-01-01" --to="2026-01-15"
+
+# Use relative dates
+rfmedia history --from="7 days ago"
+
+# Filter by mode and status
+rfmedia history --mode=album --status=completed
+
+# Show only failed operations
+rfmedia history --status=failed --limit=20
+
+# Detect duplicates
+rfmedia history --show-duplicates
+
+# Combine filters
+rfmedia history --mode=filter --command=copy-filter --from="1 month ago" --limit=100
+
+# JSON output
+rfmedia history --json
+```
+
+**JSON Output Format:**
+
+```json
+{
+  "command": "history",
+  "result": {
+    "entries": [
+      {
+        "id": 1,
+        "createdAt": "2026-01-15T10:30:00.000Z",
+        "command": "copy-album",
+        "mode": "album",
+        "inputFile": "/path/to/sources.txt",
+        "optionsHash": "album-001-010",
+        "status": "completed",
+        "totalSources": 50,
+        "completedCount": 50,
+        "failedCount": 0,
+        "startedAt": "2026-01-15T10:30:00.000Z",
+        "endedAt": "2026-01-15T11:00:00.000Z"
+      }
+    ],
+    "totalCount": 150,
+    "duplicates": [
+      {
+        "optionsHash": "album-001-010",
+        "count": 3,
+        "operationIds": [1, 5, 12]
+      }
+    ],
+    "duplicateSources": [
+      {
+        "sourcePath": "/music/Artist/Album",
+        "operationCount": 2
+      }
+    ]
+  }
+}
+```
+
+#### Type Definitions
+
+**StatsOptions** (`src/types/options.ts`):
+
+```typescript
+interface StatsOptions {
+  /** Custom path to SQLite tracking database */
+  trackingDatabase?: string;
+  /** Preview mode (no-op for stats, kept for consistency) */
+  dryRun: boolean;
+}
+```
+
+**HistoryOptions** (`src/types/options.ts`):
+
+```typescript
+interface HistoryOptions {
+  /** Start date filter (ISO format or relative like "7 days ago") */
+  from?: string;
+  /** End date filter (ISO format or relative) */
+  to?: string;
+  /** Filter by copy mode */
+  mode?: "album" | "filter";
+  /** Filter by operation status */
+  status?: "pending" | "completed" | "failed" | "partial";
+  /** Filter by command type */
+  command?: "copy-album" | "copy-filter" | "sync";
+  /** Maximum number of results to return */
+  limit: number;
+  /** Highlight duplicate operations with same options_hash */
+  showDuplicates: boolean;
+  /** Custom path to SQLite tracking database */
+  trackingDatabase?: string;
+  /** Preview mode (no-op for history, kept for consistency) */
+  dryRun: boolean;
+}
+```
+
+**StatsResult** (`src/types/results.ts`):
+
+```typescript
+interface StatsResult {
+  operations: OperationStats[];
+  totalFiles: number;
+  totalSize: number;
+  storageByRating: StorageByRating[];
+  successRateByMode: { album?: number; filter?: number };
+}
+
+interface OperationStats {
+  command: string;
+  total: number;
+  completed: number;
+  failed: number;
+  partial: number;
+  successRate: number; // Percentage (0-100)
+}
+
+interface StorageByRating {
+  range: string; // e.g., "4-5 stars", "Unrated"
+  fileCount: number;
+  totalSize: number; // Bytes
+}
+```
+
+**HistoryResult** (`src/types/results.ts`):
+
+```typescript
+interface HistoryResult {
+  entries: HistoryEntry[];
+  totalCount: number;
+  duplicates?: DuplicateGroup[];
+  duplicateSources?: DuplicateSource[];
+}
+
+interface HistoryEntry {
+  id: number;
+  createdAt: string;
+  command: string;
+  mode: string;
+  inputFile: string | null;
+  optionsHash: string;
+  status: string;
+  totalSources: number;
+  completedCount: number;
+  failedCount: number;
+  startedAt: string;
+  endedAt: string | null;
+}
+
+interface DuplicateGroup {
+  optionsHash: string;
+  count: number;
+  operationIds: number[];
+}
+
+interface DuplicateSource {
+  sourcePath: string;
+  operationCount: number;
+}
+```
+
+#### Database Tables Queried
+
+The analytics commands query the following tables:
+
+| Table               | Command        | Purpose                                   |
+| ------------------- | -------------- | ----------------------------------------- |
+| `operations`        | stats, history | Operation aggregation and history entries |
+| `inventory`         | stats          | Storage size and file counts by rating    |
+| `completed_sources` | history        | Duplicate source detection                |
+
+## Migrate-Tracking Command
+
+The `migrate-tracking` command (alias: `migrate`) provides manual migration of legacy tracking and history files to the SQLite database. While automatic migration occurs during normal operations, this command enables explicit control over the migration process.
+
+### Command Syntax
+
+```bash
+rfmedia migrate-tracking [options]
+rfmedia migrate [options]  # Alias
+```
+
+### CLI Options
+
+| Option                  | Description                                              |
+| ----------------------- | -------------------------------------------------------- |
+| `--delete-old`          | Remove legacy files after successful migration           |
+| `-f, --force`           | Skip confirmation prompts (use with `--delete-old`)      |
+| `--tracking-only`       | Only migrate tracking files (skip history)               |
+| `--history-only`        | Only migrate history files (skip tracking)               |
+| `--history-path <path>` | Custom history directory (default: `~/.rfmedia/history`) |
+| `--dry-run`             | Preview migration without making changes                 |
+
+**Note**: `--tracking-only` and `--history-only` are mutually exclusive.
+
+### File Locations
+
+| File                              | Responsibility                                                 |
+| --------------------------------- | -------------------------------------------------------------- |
+| `src/commands/migrate.ts`         | Command definition, CLI option parsing, JSON output formatting |
+| `src/actions/migrate-tracking.ts` | Three-tier action implementation (Entry -> Core -> Helpers)    |
+
+### Architecture Overview
+
+The migrate-tracking action follows the three-tier pattern used throughout rfmedia-cli:
+
+**Tier 1: Entry Function** (`executeMigrate`)
+
+- Initializes database connection
+- Orchestrates tracking and history migration
+- Handles legacy file cleanup with confirmation
+- Returns aggregated `MigrateResult`
+
+**Tier 2: Core Functions**
+
+- `migrateTrackingFiles()` - Discovers and migrates `.completed.*.txt` and `.failed.*.txt` files
+- `migrateHistoryFiles()` - Discovers and migrates `~/.rfmedia/history/*.jsonl` files
+
+**Tier 3: Helper Functions**
+
+- `discoverLegacyTrackingFiles()` - Uses fast-glob to find tracking sidecar files
+- `discoverLegacyHistoryFiles()` - Scans history directory for JSONL sessions
+- `parseTrackingFilename()` - Extracts hash and type from tracking filenames
+- `countTrackingFileEntries()` - Counts non-comment lines in tracking files
+- `groupTrackingFilesByOperation()` - Groups completed/failed pairs by hash
+- `deleteLegacyFiles()` - Removes legacy files with error collection
+
+### Migration Process Flow
+
+1. **Database Initialization**: Opens SQLite database at configured path
+2. **Tracking Discovery**: Finds `.completed.*.txt` and `.failed.*.txt` files in current directory tree
+3. **Tracking Migration**: Groups files by operation hash, imports to `completed_sources` and `failed_sources` tables
+4. **History Discovery**: Scans `~/.rfmedia/history/` for `*.jsonl` session files
+5. **History Migration**: Calls existing `migrateLegacyHistory()` function from `src/lib/history.ts`
+6. **Cleanup (optional)**: With `--delete-old`, prompts to delete migrated legacy files
+7. **Summary**: Logs migration statistics and any errors
+
+### Legacy File Patterns
+
+**Tracking Files** (discovered via fast-glob):
+
+```
+**/{*.completed.*.txt,*.failed.*.txt}
+```
+
+Example: `sources.completed.a1b2c3d4.txt`, `sources.failed.a1b2c3d4.txt`
+
+**History Files** (in history directory):
+
+```
+{timestamp}-{command}-{pid}.jsonl
+```
+
+Example: `2024-01-15T10-30-00-000Z-copy-12345.jsonl`
+
+### Integration with Existing Migration Functions
+
+The command leverages existing migration infrastructure:
+
+- **History migration**: Uses `migrateLegacyHistory(db)` from `src/lib/history.ts` (lines 810-904)
+- **Tracking migration**: Uses `migrateLegacyTracking()` from `src/lib/completed-tracker.ts`
+
+These functions are also called automatically during normal operations when legacy files are detected, but the `migrate-tracking` command provides explicit control and cleanup capabilities.
+
+### Usage Examples
+
+```bash
+# Preview migration (no changes)
+rfmedia migrate-tracking --dry-run
+
+# Migrate tracking files only
+rfmedia migrate-tracking --tracking-only
+
+# Migrate history files only
+rfmedia migrate-tracking --history-only
+
+# Migrate and delete legacy files (with confirmation)
+rfmedia migrate-tracking --delete-old
+
+# Migrate and delete without prompts
+rfmedia migrate-tracking --delete-old --force
+
+# Use custom history directory
+rfmedia migrate-tracking --history-path=/custom/path/history
+
+# Full migration with cleanup in dry-run mode
+rfmedia migrate-tracking --delete-old --dry-run
+```
+
+### JSON Output
+
+When the `--json` global flag is set, the command outputs structured JSON:
+
+```json
+{
+  "command": "migrate-tracking",
+  "result": {
+    "tracking": {
+      "operations": 3,
+      "sources": 150,
+      "legacyFiles": [
+        {
+          "path": "/path/to/sources.completed.a1b2c3d4.txt",
+          "type": "completed",
+          "hash": "a1b2c3d4",
+          "entryCount": 50,
+          "inputFile": "sources"
+        }
+      ]
+    },
+    "history": {
+      "sessions": 5,
+      "operations": 120,
+      "legacyFiles": [
+        {
+          "path": "/home/user/.rfmedia/history/2024-01-15T10-30-00-000Z-copy-12345.jsonl",
+          "sessionId": "2024-01-15T10-30-00-000Z-copy-12345",
+          "operationCount": 25,
+          "command": "copy",
+          "startedAt": "2024-01-15T10:30:00.000Z"
+        }
+      ]
+    },
+    "filesDeleted": 8,
+    "errors": []
+  }
+}
+```
+
+### Type Definitions
+
+**MigrateOptions** (`src/types/options.ts`):
+
+```typescript
+interface MigrateOptions {
+  deleteOld: boolean; // Remove legacy files after migration
+  force: boolean; // Skip confirmation prompts
+  trackingOnly: boolean; // Only migrate tracking files
+  historyOnly: boolean; // Only migrate history files
+  historyPath?: string; // Custom history directory path
+  dryRun: boolean; // Preview mode (no changes)
+}
+```
+
+**MigrateResult** (`src/types/results.ts`):
+
+```typescript
+interface MigrateResult {
+  tracking: TrackingMigrationResult;
+  history: HistoryMigrationResult;
+  filesDeleted: number;
+  errors: FailedOperation[];
+}
+```
+
+## Queue Command
+
+The queue command manages batch copy and delete jobs for later execution. Jobs are stored persistently at `~/.rfmedia/queue.json`.
+
+### Subcommands
+
+| Command                                     | Description                   |
+| ------------------------------------------- | ----------------------------- |
+| `queue add copy [source] [dest] [options]`  | Add a copy job to the queue   |
+| `queue add copy --paths <file> [options]`   | Add multi-source copy job     |
+| `queue add delete [paths...] [options]`     | Add a delete job to the queue |
+| `queue add delete --paths <file> [options]` | Add multi-source delete job   |
+| `queue list [--status]`                     | List jobs in the queue        |
+| `queue run [-w N]`                          | Execute pending jobs          |
+| `queue clear [--completed/--failed]`        | Remove jobs from queue        |
+
+### Queue Add Copy Options
+
+#### YAML-Based Input
+
+| Option                   | Description                                                              |
+| ------------------------ | ------------------------------------------------------------------------ |
+| `--paths <file>`         | Read sources and destination from YAML paths file                        |
+| `--source-idx <indices>` | Select sources by index (e.g., `"1,3"` or `"2-5"`) - requires `--paths`  |
+| `--source-name <names>`  | Unified search: matches groups, artist, or basename - requires `--paths` |
+| `--artist <names>`       | Select sources by artist name (case-insensitive) - requires `--paths`    |
+| `--group <names>`        | Select sources by group name (case-insensitive) - requires `--paths`     |
+| `-i, --interactive`      | Interactively select sources before queuing                              |
+
+### Multi-Source Jobs
+
+When using `--paths`, the queue stores resolved `PathEntry[]` in the job's `sources` field:
+
+- YAML paths are resolved at **add time**, not run time
+- Source selection filters (`--source-idx`, `--artist`, etc.) are applied at add time
+- Interactive selection (`--interactive`) filters sources at add time
+- The `CopySelection.sourceSelections` Map (album/track refinements) cannot be serialized - only source-level selection is preserved
+
+**Serialization Strategy:**
+
+1. When `queue add copy --paths` is invoked, YAML is loaded and validated immediately
+2. Source selection filters are applied to reduce the `PathEntry[]`
+3. The filtered `PathEntry[]` is stored in `job.sources` (not the YAML file path)
+4. At run time, the copy action receives `cliSourceEntries` populated from `job.sources`
+5. The original YAML file is NOT required at run time
+
+**Job Types:**
+
+- **Single-source job**: Has `source: string` field (traditional CLI usage)
+- **Multi-source job**: Has `sources: PathEntry[]` field (from `--paths` or `--file`)
+- Jobs have exactly one of these fields, never both
+
+### Usage Examples
+
+```bash
+# Add copy jobs
+rfmedia queue add copy /music/Artist /dest --range=001-005
+rfmedia queue add copy /music/Artist /dest --min-stars=4
+rfmedia queue add copy --paths sources.yml --group=pop-divas
+
+# Add delete jobs
+rfmedia queue add delete /music/Artist /dest --range=008-010
+rfmedia queue add delete /music/Artist /dest --count=3 --trash
+rfmedia queue add delete --paths sources.yml --interactive
+
+# Queue with source filtering
+rfmedia queue add copy --paths sources.yml --artist="Taylor Swift,Beyoncé"
+rfmedia queue add delete --paths sources.yml --source-idx="1,3-5"
+
+# List all jobs (shows type column: copy/delete)
+rfmedia queue list
+
+# List only pending jobs with details
+rfmedia queue list --status=pending --verbose
+
+# Run queue with 2 parallel workers (handles both copy and delete)
+rfmedia queue run --workers=2
+
+# Run queue and continue despite failures
+rfmedia queue run --continue-on-error
+
+# Clear only completed jobs
+rfmedia queue clear --completed
+
+# Force clear all jobs
+rfmedia queue clear --force
+```
+
+### Queue File Format
+
+The queue is stored as JSON at `~/.rfmedia/queue.json`:
+
+```json
+{
+  "version": "1",
+  "updatedAt": "2024-01-15T10:30:00.000Z",
+  "jobs": [
+    {
+      "id": "uuid-1",
+      "jobType": "copy",
+      "addedAt": "2024-01-15T10:00:00.000Z",
+      "source": "/path/to/source",
+      "destination": "/path/to/dest",
+      "options": { ... },
+      "status": "pending"
+    },
+    {
+      "id": "uuid-2",
+      "jobType": "delete",
+      "addedAt": "2024-01-15T10:05:00.000Z",
+      "source": "/path/to/source",
+      "destination": "/path/to/dest",
+      "options": { "useTrash": true, ... },
+      "status": "pending"
+    }
+  ]
+}
+```
+
+### Integration
+
+- **Job Types**: Queue supports both copy and delete operations in the same batch
+- **Tracking**: Each job creates its own operation in the tracking database
+- **History**: Single HistoryRecorder session for entire queue run
+- **Plex**: Batch scan triggered after all jobs complete (configurable)
+- **Graceful Interruption**: Queue state saved on SIGINT
+- **Backward Compatibility**: Jobs without `jobType` field default to 'copy'
+
+## Graceful Interruption
+
+The CLI supports graceful handling of SIGINT/SIGTERM signals to prevent data corruption during file operations.
+
+### Overview
+
+When a user presses Ctrl+C during a copy operation, the system:
+
+1. Stops accepting new work items
+2. Waits for in-progress file operations to complete
+3. Cleans up any partial files
+4. Saves tracking/history state
+5. Closes database connections
+6. Exits cleanly
+
+### Key Files
+
+| File                        | Purpose                                                                    |
+| --------------------------- | -------------------------------------------------------------------------- |
+| `src/lib/signal-handler.ts` | Singleton `SignalManager` with `AbortController`, cleanup handler registry |
+| `src/lib/parallel.ts`       | Passes `AbortSignal` to processor, checks abort state between items        |
+| `src/lib/filesystem.ts`     | Checks abort signal during copy, cleans up partial files                   |
+| `src/lib/progress-bar.ts`   | Listens for abort signal to stop progress display                          |
+
+### Integration Pattern
+
+Actions integrate graceful interruption by:
+
+1. Importing signal utilities
+2. Creating a local `AbortController` linked to the global signal
+3. Registering cleanup handlers with priorities (lower = runs first)
+4. Passing the signal to parallel processing and file operations
+5. Unregistering handlers in `finally` block
+
+```typescript
+// In action file (e.g., copy-album.ts)
+const { getGlobalSignal, registerGlobalCleanup, unregisterGlobalCleanup } = await import("../lib/signal-handler.js");
+
+const localAbortController = new AbortController();
+const globalSignal = getGlobalSignal();
+const inProgressFiles = new Set<string>();
+
+// Link local controller to global signal
+globalSignal.addEventListener("abort", () => localAbortController.abort());
+
+// Register cleanup handlers (priority: lower runs first)
+registerGlobalCleanup({
+  priority: 10,
+  name: "copy-album-abort",
+  cleanup: () => localAbortController.abort(),
+});
+
+registerGlobalCleanup({
+  priority: 15,
+  name: "copy-album-partial-files",
+  cleanup: async () => {
+    for (const path of inProgressFiles) {
+      await cleanupPartialFile(path);
+    }
+  },
+});
+
+// ... operation code ...
+
+// In finally block:
+unregisterGlobalCleanup("copy-album-abort");
+unregisterGlobalCleanup("copy-album-partial-files");
+```
+
+### Cleanup Priority Order
+
+| Priority | Handler          | Purpose                     |
+| -------- | ---------------- | --------------------------- |
+| 10       | Abort controller | Stops new work              |
+| 15       | Partial files    | Cleans up incomplete copies |
+| 50       | History recorder | Saves undo session          |
+| 70       | Database         | Closes SQLite connection    |
+
+### Implementation Status
+
+| Action             | Status      |
+| ------------------ | ----------- |
+| `copy-album.ts`    | Implemented |
+| `copy-filter.ts`   | Implemented |
+| `verify-album.ts`  | Implemented |
+| `verify-filter.ts` | Implemented |
+| `sync.ts`          | Implemented |
+| `clean.ts`         | Pending     |
+
+**Phase 2 Completion Notes:**
+
+- All 5 major actions have graceful interruption support
+- Signal propagation complete through all call chains
+- Partial file cleanup working for interrupted copy/convert operations
+- Database and history cleanup integrated with proper priority ordering
+
+### Detailed Documentation
+
+See `docs/features/graceful-interruption.md` for complete architecture documentation.
+
+## Plugin System
+
+The CLI supports a plugin system for extending copy operations with custom processing, external tool integration, and metadata extraction. Plugins hook into the copy workflow at defined points and execute in priority order.
+
+### Architecture Overview
+
+The plugin system consists of four main components:
+
+1. **PluginManager** - Singleton that handles plugin discovery, loading, and lifecycle management
+2. **PluginLoader** - Discovers plugins from directories, validates structure, creates external command plugins
+3. **PluginRunner** - Executes hook handlers with priority ordering and error handling
+4. **ExternalCommand** - Spawns external processes with timeout and cancellation support
+
+### Hook Types
+
+Plugins can register handlers for four hook points in the copy workflow:
+
+| Hook          | When Executed                    | Use Cases                                        |
+| ------------- | -------------------------------- | ------------------------------------------------ |
+| `beforeCopy`  | Before each file copy/convert    | Pre-processing, validation, logging              |
+| `afterCopy`   | After each file copy completes   | Post-processing, external tool integration       |
+| `processFile` | During filter mode metadata scan | Metadata extraction, rating sync, analysis       |
+| `afterBatch`  | After all sources complete       | Batch notifications, external imports, summaries |
+
+### Hook Execution
+
+Hooks execute in priority order (lower numbers run first). Plugins without a priority default to 50:
+
+```typescript
+// Execution order example:
+// Plugin A (priority: 10) -> Plugin B (priority: 50) -> Plugin C (priority: 100)
+```
+
+### Plugin Interface
+
+Plugins are ESM modules that export a default object implementing the `RfmediaPlugin` interface:
+
+```typescript
+// ~/.rfmedia/plugins/my-plugin/index.js
+export default {
+  name: "my-plugin",
+  version: "1.0.0",
+  description: "Logs all copy operations",
+  priority: 50, // Lower runs first (default: 50)
+  enabled: true,
+  hooks: [
+    {
+      type: "afterCopy",
+      handler: async (ctx, result) => {
+        console.log(`Copied: ${ctx.sourcePath} -> ${ctx.destPath}`);
+      },
+    },
+  ],
+};
+```
+
+### Key Type Definitions
+
+**RfmediaPlugin** - Main plugin interface:
+
+```typescript
+interface RfmediaPlugin {
+  name: string; // Unique plugin identifier
+  version: string; // Semantic version (e.g., "1.0.0")
+  description?: string; // Human-readable description
+  priority?: number; // Execution order (default: 50)
+  enabled?: boolean; // Whether plugin is active (default: true)
+  hooks?: PluginHook[]; // Array of hook handlers
+}
+```
+
+**PluginHook** - Discriminated union of hook types:
+
+```typescript
+type PluginHook = BeforeCopyHook | AfterCopyHook | ProcessFileHook | AfterBatchHook;
+
+interface BeforeCopyHook {
+  type: "beforeCopy";
+  handler: (ctx: BeforeCopyContext) => Promise<void>;
+}
+
+interface AfterCopyHook {
+  type: "afterCopy";
+  handler: (ctx: AfterCopyContext, result: CopyResult) => Promise<void>;
+}
+
+interface ProcessFileHook {
+  type: "processFile";
+  handler: (ctx: ProcessFileContext) => Promise<void>;
+}
+
+interface AfterBatchHook {
+  type: "afterBatch";
+  handler: (ctx: AfterBatchContext) => Promise<void>;
+}
+```
+
+**Context Types:**
+
+| Context              | Fields                                                      |
+| -------------------- | ----------------------------------------------------------- |
+| `BeforeCopyContext`  | `sourcePath`, `destPath`, `isAudioFile`, `convertFormat?`   |
+| `AfterCopyContext`   | `sourcePath`, `destPath`, `method`, `fileSize`              |
+| `ProcessFileContext` | `filePath`, `metadata` (ExtendedMetadata)                   |
+| `AfterBatchContext`  | `results` (CopyResult[]), `sources`, `historyId?`, `signal` |
+
+### External Command Plugins
+
+External tools can be integrated without writing code using YAML configuration:
+
+```yaml
+# In .rfmedia.yaml
+plugins:
+  commands:
+    - name: beets-import
+      command: beet
+      args: ["import", "-q", "{destPath}"]
+      timeout: 300000 # 5 minutes
+      hooks:
+        afterBatch: true
+
+    - name: notify-complete
+      command: notify-send
+      args: ["rfmedia", "Copy complete: {resultCount} sources processed"]
+      hooks:
+        afterBatch: "--urgency=low {sources}"
+```
+
+**Argument Placeholders:**
+
+| Placeholder     | Available In | Description                           |
+| --------------- | ------------ | ------------------------------------- |
+| `{sourcePath}`  | afterCopy    | Source file path                      |
+| `{destPath}`    | afterCopy    | Destination file path                 |
+| `{method}`      | afterCopy    | Copy method (copy/hardlink/converted) |
+| `{fileSize}`    | afterCopy    | File size in bytes                    |
+| `{sources}`     | afterBatch   | Comma-separated source paths          |
+| `{historyId}`   | afterBatch   | History session ID                    |
+| `{resultCount}` | afterBatch   | Number of processed sources           |
+
+### Key Files
+
+| File                          | Purpose                                                |
+| ----------------------------- | ------------------------------------------------------ |
+| `src/types/plugins.ts`        | Type definitions (RfmediaPlugin, PluginHook, contexts) |
+| `src/lib/plugin-loader.ts`    | Plugin discovery, ESM loading, validation              |
+| `src/lib/plugin-manager.ts`   | Singleton manager with cleanup registration            |
+| `src/lib/plugin-runner.ts`    | Hook execution with priority ordering                  |
+| `src/lib/external-command.ts` | External process spawning with timeout/abort           |
+| `src/commands/plugin.ts`      | CLI command definitions                                |
+| `src/actions/plugin.ts`       | Plugin list/info/dir implementations                   |
+
+### CLI Commands
+
+**`plugin list`** - List installed plugins:
+
+```bash
+rfmedia plugin list
+rfmedia plugin list --json
+```
+
+**`plugin info <name>`** - Show plugin details:
+
+```bash
+rfmedia plugin info my-plugin
+rfmedia plugin info my-plugin --json
+```
+
+**`plugin dir`** - Show plugin search directories:
+
+```bash
+rfmedia plugin dir
+# Output: /home/user/.rfmedia/plugins
+```
+
+### Configuration Options
+
+```yaml
+# .rfmedia.yaml
+plugins:
+  # Enable/disable the entire plugin system (default: true)
+  enabled: true
+
+  # Primary plugin directory (default: ~/.rfmedia/plugins/)
+  directory: ~/.rfmedia/plugins
+
+  # Additional directories to search for plugins
+  additionalDirectories:
+    - /opt/rfmedia/plugins
+
+  # Plugins to disable by name
+  disabled:
+    - problematic-plugin
+
+  # External command plugins (see External Command Plugins section)
+  commands: []
+```
+
+### Plugin Manager Singleton
+
+The `PluginManager` follows the `SignalManager` pattern with cleanup registration:
+
+```typescript
+// Get the singleton instance
+const manager = PluginManager.getInstance();
+
+// Initialize with config (idempotent)
+await manager.initialize(config.plugins);
+
+// Access loaded plugins
+const plugins = manager.getPlugins();
+const myPlugin = manager.getPluginByName("my-plugin");
+
+// Check initialization state
+if (manager.isInitialized()) {
+  // Plugins are ready
+}
+```
+
+**Cleanup Priority:**
+
+The plugin manager registers cleanup at priority 30 (after abort handlers at 10-15, before history recorder at 50).
+
+### Error Classes
+
+| Class                  | When Thrown                           |
+| ---------------------- | ------------------------------------- |
+| `PluginLoadError`      | Plugin file not found, invalid export |
+| `PluginExecutionError` | Hook handler throws during execution  |
+| `ExternalCommandError` | External command fails or times out   |
+
+### Writing a Plugin
+
+1. Create plugin directory: `~/.rfmedia/plugins/my-plugin/`
+2. Create entry point: `index.js` (ESM module)
+3. Export default object with `name`, `version`, and `hooks`
+
+**Example: Notification Plugin**
+
+```javascript
+// ~/.rfmedia/plugins/notify/index.js
+import { exec } from "node:child_process";
+
+export default {
+  name: "notify",
+  version: "1.0.0",
+  description: "Desktop notifications for copy operations",
+  priority: 100, // Run after other plugins
+  hooks: [
+    {
+      type: "afterBatch",
+      handler: async (ctx) => {
+        const totalCreated = ctx.results.reduce((sum, r) => sum + r.created, 0);
+        const msg = `rfmedia: Copied ${totalCreated} files from ${ctx.sources.length} sources`;
+        exec(`notify-send "Copy Complete" "${msg}"`);
+      },
+    },
+  ],
+};
+```
+
+### Detailed Documentation
+
+See `docs/features/plugins.md` for complete user documentation and examples.
+
+## Future Work
+
+See `TODO.md` for planned enhancements.

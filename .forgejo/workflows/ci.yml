@@ -1,0 +1,52 @@
+name: Forgejo CI
+
+on:
+  push:
+    branches:
+      - master
+      - main
+      - feat/**
+      - test/**
+  pull_request:
+
+jobs:
+  runner-labels:
+    name: runner-${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner:
+          - ubuntu-latest
+          - ubuntu-24
+          - node-22
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Verify runner label
+        run: |
+          echo "Runner label: ${{ matrix.runner }}"
+          uname -a
+          node --version 2>/dev/null || echo "node not in PATH (expected for ubuntu-* act images)"
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build rf-common
+        run: npm run build -w packages/rf-common
+
+      - name: Test rfapps CLI
+        run: npm run test:run -w packages/rfapps-cli

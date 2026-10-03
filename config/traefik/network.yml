@@ -1,0 +1,22 @@
+http:
+  routers:
+    unifiGw:
+      rule: Host(`unifi.{{ env "DOMAIN" }}`)
+      entryPoints:
+        - websecure
+      service: unifiGw
+      middlewares:
+        - authentik-dev-file
+      tls:
+        certResolver: letsencrypt
+
+  services:
+    unifiGw:
+      loadBalancer:
+        servers:
+          - url: https://{{ env "UNIFI_GW_IP" }}
+        serversTransport: insecureTransport
+
+  serversTransports:
+    insecureTransport:
+      insecureSkipVerify: true

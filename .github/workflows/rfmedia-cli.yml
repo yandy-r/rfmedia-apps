@@ -1,0 +1,84 @@
+name: rfmedia CLI
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/rfmedia-cli.yml"
+      - "package-lock.json"
+      - "package.json"
+      - "packages/rf-common/**"
+      - "packages/rfmedia-cli/**"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/rfmedia-cli.yml"
+      - "package-lock.json"
+      - "package.json"
+      - "packages/rf-common/**"
+      - "packages/rfmedia-cli/**"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test Lidarr code generation tooling
+        run: npm run test:codegen:lidarr --workspace packages/rfmedia-cli
+
+      - name: Check generated Lidarr client drift
+        run: npm run codegen:lidarr:check --workspace packages/rfmedia-cli
+
+      - name: Build rf-common
+        run: npm run build -w packages/rf-common
+
+      - name: Typecheck rfmedia CLI
+        run: npm run typecheck --workspace packages/rfmedia-cli
+
+      - name: Test rfmedia CLI
+        run: npm run test:coverage --workspace packages/rfmedia-cli
+
+  bench:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build rf-common
+        run: npm run build -w packages/rf-common
+
+      - name: Run benchmarks (smoke scales)
+        env:
+          # Shared CI runners are too noisy for regression gating; run reduced
+          # scales as a smoke check that the suite stays executable.
+          RFMEDIA_BENCH_SCALES: "10,100"
+        run: npm run bench --workspace packages/rfmedia-cli

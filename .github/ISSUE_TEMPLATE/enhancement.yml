@@ -1,0 +1,107 @@
+name: Enhancement
+description: Propose a new feature, improvement, or architecture change.
+title: "[enhancement] "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for net-new capabilities or improvements.
+        Include enough scope and verification detail for direct implementation.
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Pre-submission Checklist
+      options:
+        - label: I searched existing issues and docs for related requests.
+          required: true
+        - label: This is a feature request, not a bug or private security report.
+          required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: One clear paragraph describing the requested enhancement.
+      placeholder: Add a brief statement of the change and expected value.
+    validations:
+      required: true
+  - type: textarea
+    id: rationale
+    attributes:
+      label: Rationale
+      description: Explain why this should exist and what pain point it solves.
+      placeholder: Current gap, impact, and why now.
+    validations:
+      required: true
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope
+      description: Estimated implementation size.
+      options:
+        - Small (1-2 files)
+        - Medium (3-5 files)
+        - Large (6+ files)
+      default: 1
+    validations:
+      required: true
+  - type: dropdown
+    id: affected_areas
+    attributes:
+      label: Affected Areas
+      description: Select all areas likely impacted.
+      multiple: true
+      options:
+        - rfapps-cli
+        - rfmedia-cli
+        - plex
+        - architecture
+        - performance
+        - testing
+        - future
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - Low
+        - Medium
+        - High
+      default: 1
+    validations:
+      required: true
+  - type: textarea
+    id: affected_files
+    attributes:
+      label: Affected Files
+      description: List expected files, modules, or services.
+      placeholder: |
+        - packages/rfmedia-cli/src/...
+        - docs/features/...
+    validations:
+      required: true
+  - type: textarea
+    id: implementation_notes
+    attributes:
+      label: Implementation Notes
+      description: Concrete approach notes, constraints, and non-goals.
+      placeholder: Known approach constraints, API considerations, dependencies.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance Criteria
+      description: Define objective completion criteria.
+      placeholder: |
+        - [ ] Behavior X works in scenario Y.
+        - [ ] Tests A and B cover edge cases.
+    validations:
+      required: true
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: Additional Context
+      description: Links to related issues, PRs, docs, or research.
+      placeholder: Related links or references.

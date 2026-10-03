@@ -1,0 +1,60 @@
+http:
+  routers:
+    homebridge:
+      rule: Host(`homebridge.{{ env "DOMAIN" }}`)
+      entryPoints:
+        - websecure
+      service: homebridge
+      middlewares:
+        - authentik-dev-file
+      tls:
+        certResolver: letsencrypt
+
+    homeassistant:
+      rule: Host(`ha.{{ env "DOMAIN" }}`)
+      entryPoints:
+        - websecure
+      service: homeassistant
+      middlewares:
+        - authentik-dev-file
+      tls:
+        certResolver: letsencrypt
+
+    scrypted:
+      rule: Host(`scrypted.{{ env "DOMAIN" }}`)
+      entryPoints:
+        - websecure
+      service: scrypted
+      middlewares:
+        - authentik-dev-file
+      tls:
+        certResolver: letsencrypt
+
+    zigbee2mqtt:
+      rule: Host(`z2m.{{ env "DOMAIN" }}`)
+      entryPoints:
+        - websecure
+      service: zigbee2mqtt
+      middlewares:
+        - authentik-dev-file
+      tls:
+        certResolver: letsencrypt
+
+  services:
+    homebridge:
+      loadBalancer:
+        servers:
+          - url: http://{{ env "HOMEAUTO_SERVER" }}:8581
+    homeassistant:
+      loadBalancer:
+        servers:
+          - url: http://{{ env "HOMEAUTO_SERVER" }}:8123
+    scrypted:
+      loadBalancer:
+        servers:
+          - url: https://{{ env "HOMEAUTO_SERVER" }}:10443
+        serversTransport: insecureTransport
+    zigbee2mqtt:
+      loadBalancer:
+        servers:
+          - url: http://{{ env "HOMEAUTO_SERVER" }}:8080

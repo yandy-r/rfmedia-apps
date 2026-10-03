@@ -1,0 +1,29 @@
+{
+  // markdownlint-cli2 operational config: file selection + rule config.
+  // Rules are shared with editors via .markdownlint.json (extended below);
+  // this file only adds the cli2-specific globs/ignores so `npm run lint:md`
+  // lints the right files (and never node_modules).
+  "config": {
+    "extends": ".markdownlint.json"
+  },
+  "globs": ["**/*.md"],
+  "ignores": [
+    "node_modules",
+    "**/node_modules",
+    "dist",
+    "**/dist",
+    "build",
+    "**/build",
+    "coverage",
+    "**/coverage",
+    "CHANGELOG.md",
+    "**/CHANGELOG.md",
+    // Working scratch logs — intentional multiple H1s, not published docs.
+    "tasks",
+    // Agent-generated research scratch — not published docs.
+    "research",
+    // Generated knowledge-graph artifacts — gitignored, not published docs.
+    "graphify-out",
+    "**/graphify-out"
+  ]
+}

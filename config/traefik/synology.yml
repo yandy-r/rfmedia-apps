@@ -1,0 +1,33 @@
+http:
+  routers:
+    nas01:
+      rule: Host(`nas01.{{ env "DOMAIN" }}`)
+      entryPoints:
+        - websecure
+      service: nas01
+      middlewares:
+        # - authentik-dev-file
+      tls:
+        certResolver: letsencrypt
+
+    nas02:
+      rule: Host(`nas02.{{ env "DOMAIN" }}`)
+      entryPoints:
+        - websecure
+      service: nas02
+      middlewares:
+        # - authentik-dev-file
+      tls:
+        certResolver: letsencrypt
+
+  services:
+    nas01:
+      loadBalancer:
+        servers:
+          - url: https://{{ env "NAS01_IP" }}:5001
+        serversTransport: insecureTransport
+    nas02:
+      loadBalancer:
+        servers:
+          - url: https://{{ env "NAS02_IP" }}:5001
+        serversTransport: insecureTransport

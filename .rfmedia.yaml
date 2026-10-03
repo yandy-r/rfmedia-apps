@@ -1,0 +1,925 @@
+copy:
+  outputFolder: liked-songs
+  hardlink: false
+  force: false
+  workers: 8
+  progress: true
+  albumOnly: false
+  preserveStructure: false
+  albumMode: true
+  trackCompleted: true
+  deleteDowngraded: true
+  diskSpaceMargin: 5
+  requireDiskSpace: false
+clean:
+  force: false
+  minFiles: 1
+  exclude: []
+  useTrash: false
+watch:
+  outputFolder: liked-songs
+  hardlink: false
+  debounceMs: 5000
+  albumOnly: false
+  preserveStructure: false
+linkVideos:
+  minScore: 70
+  preferredFormat: mkv
+  progress: true
+global:
+  debug: false
+plex:
+  url: "{{ PLEX_MUSIC_URL }}"
+  token: "{{ PLEX_MUSIC_TOKEN }}"
+  scanAfterCopy: true
+  scanPerSource: true
+  libraries:
+    - library: Music
+      path: /data/media/music
+    - library: Music
+      path: /data/media/music-tidal
+undo:
+  enabled: true
+  retentionDays: 30
+  maxSizeMB: 100
+
+discovery:
+  lastfm:
+    apiKey: "{{ LASTFM_API_KEY }}"
+    timeoutMs: 15000
+
+plexFilters:
+  teen-pop:
+    match: all
+    library: Music
+    type: artist
+    rules:
+      - type: rule
+        field: style
+        operator: contains
+        value: Teen Pop
+      - type: group
+        match: any
+        rules:
+          - type: rule
+            field: trackRating
+            operator: ">="
+            value: 3
+  teen-pop-2:
+    match: all
+    library: Music
+    type: artist
+    rules:
+      - type: rule
+        field: style
+        operator: contains
+        value: Teen Pop
+      - type: group
+        match: any
+        rules:
+          - type: rule
+            field: albumRating
+            operator: ">="
+            value: 3
+          - type: rule
+            field: trackRating
+            operator: ">="
+            value: 3
+  teen-pop-3:
+    match: all
+    library: Music
+    type: artist
+    rules:
+      - type: rule
+        field: style
+        operator: contains
+        value: Teen Pop
+      - type: group
+        match: any
+        rules:
+          - type: rule
+            field: artistRating
+            operator: ">="
+            value: 3
+          - type: rule
+            field: albumRating
+            operator: ">="
+            value: 3
+          - type: rule
+            field: trackRating
+            operator: ">="
+            value: 3
+
+  female-pop-artists:
+    match: all
+    library: Music
+    type: artist
+    rules:
+      - type: rule
+        field: artistRating
+        operator: ">="
+        value: 3
+      - type: group
+        match: any
+        rules:
+          - type: rule
+            field: artist
+            operator: contains
+            value: Britney Spears
+          - type: rule
+            field: artist
+            operator: contains
+            value: Shakira
+          - type: rule
+            field: artist
+            operator: contains
+            value: Christina Aguilera
+          - type: rule
+            field: artist
+            operator: contains
+            value: Jessica Simpson
+          - type: rule
+            field: artist
+            operator: contains
+            value: Mariah Carey
+          - type: rule
+            field: artist
+            operator: contains
+            value: Paulina Rubio
+          - type: rule
+            field: artist
+            operator: contains
+            value: Avril Lavigne
+          - type: rule
+            field: artist
+            operator: contains
+            value: Katy Perry
+          - type: rule
+            field: artist
+            operator: contains
+            value: Taylor Swift
+          - type: rule
+            field: artist
+            operator: contains
+            value: Lady Gaga
+          - type: rule
+            field: artist
+            operator: contains
+            value: Willa Ford
+          - type: rule
+            field: artist
+            operator: contains
+            value: Ariana Grande
+          - type: rule
+            field: artist
+            operator: contains
+            value: Rihanna
+          - type: rule
+            field: artist
+            operator: contains
+            value: Beyoncé
+          - type: rule
+            field: artist
+            operator: contains
+            value: Selena Gomez
+          - type: rule
+            field: artist
+            operator: contains
+            value: Gwen Stefani
+          - type: rule
+            field: artist
+            operator: contains
+            value: Fergie
+          - type: rule
+            field: artist
+            operator: contains
+            value: Pink
+          - type: rule
+            field: artist
+            operator: contains
+            value: Demi Lovato
+          - type: rule
+            field: artist
+            operator: contains
+            value: Jennifer Lopez
+          - type: rule
+            field: artist
+            operator: contains
+            value: Nicole Scherzinger
+          - type: rule
+            field: artist
+            operator: contains
+            value: Dua Lipa
+          - type: rule
+            field: artist
+            operator: contains
+            value: Sabrina Carpenter
+          - type: rule
+            field: artist
+            operator: contains
+            value: Miley Cyrus
+          - type: rule
+            field: artist
+            operator: contains
+            value: Ciara
+          - type: rule
+            field: artist
+            operator: contains
+            value: Nelly Furtado
+          - type: rule
+            field: artist
+            operator: contains
+            value: Camila Cabello
+          - type: rule
+            field: artist
+            operator: contains
+            value: Kesha
+          - type: rule
+            field: artist
+            operator: contains
+            value: Madison Beer
+          - type: rule
+            field: artist
+            operator: contains
+            value: Kelly Clarkson
+          - type: rule
+            field: artist
+            operator: contains
+            value: Natalie Imbruglia
+          - type: rule
+            field: artist
+            operator: contains
+            value: Megan Thee Stallion
+          - type: rule
+            field: artist
+            operator: contains
+            value: Toni Braxton
+          - type: rule
+            field: artist
+            operator: contains
+            value: Gwen Stefani
+          - type: rule
+            field: artist
+            operator: contains
+            value: The Pussycat Dolls
+          - type: rule
+            field: artist
+            operator: contains
+            value: Fifth Harmony
+          - type: rule
+            field: artist
+            operator: contains
+            value: Spice Girls
+          - type: rule
+            field: artist
+            operator: contains
+            value: Girls Aloud
+
+  female-country-pop-artists:
+    match: all
+    library: Music
+    type: artist
+    rules:
+      - type: rule
+        field: artistRating
+        operator: ">="
+        value: 3
+      - type: group
+        match: any
+        rules:
+          - type: rule
+            field: artist
+            operator: contains
+            value: Taylor Swift
+          - type: rule
+            field: artist
+            operator: contains
+            value: Kacey Musgraves
+          - type: rule
+            field: artist
+            operator: contains
+            value: Carrie Underwood
+          - type: rule
+            field: artist
+            operator: contains
+            value: Shania Twain
+          - type: rule
+            field: artist
+            operator: contains
+            value: Faith Hill
+          - type: rule
+            field: artist
+            operator: contains
+            value: LeAnn Rimes
+          - type: rule
+            field: artist
+            operator: contains
+            value: Kelsea Ballerini
+          - type: rule
+            field: artist
+            operator: contains
+            value: Maren Morris
+          - type: rule
+            field: artist
+            operator: contains
+            value: Mickey Guyton
+          - type: rule
+            field: artist
+            operator: contains
+            value: Carly Pearce
+          - type: rule
+            field: artist
+            operator: contains
+            value: Gabby Barrett
+          - type: rule
+            field: artist
+            operator: contains
+            value: Maddie & Tae
+          - type: rule
+            field: artist
+            operator: contains
+            value: The Chicks
+          - type: rule
+            field: artist
+            operator: contains
+            value: Jessie James Decker
+          - type: rule
+            field: artist
+            operator: contains
+            value: Danielle Bradbery
+          - type: rule
+            field: artist
+            operator: contains
+            value: Cassadee Pope
+          - type: rule
+            field: artist
+            operator: contains
+            value: Ingrid Andress
+          - type: rule
+            field: artist
+            operator: contains
+            value: Lainey Wilson
+          - type: rule
+            field: artist
+            operator: contains
+            value: Priscilla Block
+          - type: rule
+            field: artist
+            operator: contains
+            value: Megan Moroney
+          - type: rule
+            field: artist
+            operator: contains
+            value: Miranda Lambert
+          - type: rule
+            field: artist
+            operator: contains
+            value: Carly Pearce
+          - type: rule
+            field: artist
+            operator: contains
+            value: Pistol Annies
+          - type: rule
+            field: artist
+            operator: contains
+            value: Tenille Arts
+          - type: rule
+            field: artist
+            operator: contains
+            value: Kelly Pickler
+
+  female-rnb-artists:
+    match: all
+    library: Music
+    type: artist
+    rules:
+      - type: rule
+        field: artistRating
+        operator: ">="
+        value: 3
+      - type: group
+        match: any
+        rules:
+          - type: rule
+            field: artist
+            operator: contains
+            value: SZA
+          - type: rule
+            field: artist
+            operator: contains
+            value: Summer Walker
+          - type: rule
+            field: artist
+            operator: contains
+            value: H.E.R.
+          - type: rule
+            field: artist
+            operator: contains
+            value: Jazmine Sullivan
+          - type: rule
+            field: artist
+            operator: contains
+            value: Kehlani
+          - type: rule
+            field: artist
+            operator: contains
+            value: Jhené Aiko
+          - type: rule
+            field: artist
+            operator: contains
+            value: Tinashe
+          - type: rule
+            field: artist
+            operator: contains
+            value: Victoria Monét
+          - type: rule
+            field: artist
+            operator: contains
+            value: Ella Mai
+          - type: rule
+            field: artist
+            operator: contains
+            value: Normani
+          - type: rule
+            field: artist
+            operator: contains
+            value: Kali Uchis
+          - type: rule
+            field: artist
+            operator: contains
+            value: Beyoncé
+          - type: rule
+            field: artist
+            operator: contains
+            value: Rihanna
+          - type: rule
+            field: artist
+            operator: contains
+            value: Alicia Keys
+          - type: rule
+            field: artist
+            operator: contains
+            value: Toni Braxton
+          - type: rule
+            field: artist
+            operator: contains
+            value: Brandy
+          - type: rule
+            field: artist
+            operator: contains
+            value: Monica
+          - type: rule
+            field: artist
+            operator: contains
+            value: Ashanti
+          - type: rule
+            field: artist
+            operator: contains
+            value: Mýa
+          - type: rule
+            field: artist
+            operator: contains
+            value: Ciara
+
+filters:
+  # Filter for tracks rated 3+ stars
+  # Good for creating a broader "liked" collection
+  liked:
+    match: all
+    rules:
+      - type: rule
+        field: rating
+        operator: ">="
+        value: 3.0 # 3+ stars
+
+  # Filter for high-quality rock tracks - 3.5+ stars and rock genre
+  high-quality-rock:
+    match: all
+    rules:
+      - type: rule
+        field: rating
+        operator: ">="
+        value: 3.5
+      - type: group
+        match: any
+        rules:
+          - type: rule
+            field: genre
+            operator: contains
+            value: Rock
+          - type: rule
+            field: genre
+            operator: contains
+            value: Alternative
+          - type: rule
+            field: genre
+            operator: contains
+            value: Metal
+
+  # Filter for female artists - 3.5+ stars and female artist names
+  female-pop-artists:
+    match: all
+    rules:
+      - type: rule
+        field: rating
+        operator: ">="
+        value: 3.5
+      - type: group
+        match: any
+        rules:
+          - type: rule
+            field: artist
+            operator: contains
+            value: Britney Spears
+          - type: rule
+            field: artist
+            operator: contains
+            value: Shakira
+          - type: rule
+            field: artist
+            operator: contains
+            value: Christina Aguilera
+          - type: rule
+            field: artist
+            operator: contains
+            value: Jessica Simpson
+          - type: rule
+            field: artist
+            operator: contains
+            value: Mariah Carey
+          - type: rule
+            field: artist
+            operator: contains
+            value: Paulina Rubio
+          - type: rule
+            field: artist
+            operator: contains
+            value: Avril Lavigne
+          - type: rule
+            field: artist
+            operator: contains
+            value: Katy Perry
+          - type: rule
+            field: artist
+            operator: contains
+            value: Taylor Swift
+          - type: rule
+            field: artist
+            operator: contains
+            value: Lady Gaga
+          - type: rule
+            field: artist
+            operator: contains
+            value: Willa Ford
+          - type: rule
+            field: artist
+            operator: contains
+            value: Ariana Grande
+          - type: rule
+            field: artist
+            operator: contains
+            value: Rihanna
+          - type: rule
+            field: artist
+            operator: contains
+            value: Beyoncé
+          - type: rule
+            field: artist
+            operator: contains
+            value: Selena Gomez
+          - type: rule
+            field: artist
+            operator: contains
+            value: Gwen Stefani
+          - type: rule
+            field: artist
+            operator: contains
+            value: Fergie
+          - type: rule
+            field: artist
+            operator: contains
+            value: Pink
+          - type: rule
+            field: artist
+            operator: contains
+            value: Demi Lovato
+          - type: rule
+            field: artist
+            operator: contains
+            value: Jennifer Lopez
+          - type: rule
+            field: artist
+            operator: contains
+            value: Nicole Scherzinger
+          - type: rule
+            field: artist
+            operator: contains
+            value: Dua Lipa
+          - type: rule
+            field: artist
+            operator: contains
+            value: Sabrina Carpenter
+          - type: rule
+            field: artist
+            operator: contains
+            value: Miley Cyrus
+          - type: rule
+            field: artist
+            operator: contains
+            value: Ciara
+          - type: rule
+            field: artist
+            operator: contains
+            value: Nelly Furtado
+          - type: rule
+            field: artist
+            operator: contains
+            value: Camila Cabello
+          - type: rule
+            field: artist
+            operator: contains
+            value: Kesha
+          - type: rule
+            field: artist
+            operator: contains
+            value: Madison Beer
+          - type: rule
+            field: artist
+            operator: contains
+            value: Kelly Clarkson
+          - type: rule
+            field: artist
+            operator: contains
+            value: Natalie Imbruglia
+          - type: rule
+            field: artist
+            operator: contains
+            value: Megan Thee Stallion
+          - type: rule
+            field: artist
+            operator: contains
+            value: Toni Braxton
+          - type: rule
+            field: artist
+            operator: contains
+            value: Gwen Stefani
+          - type: rule
+            field: artist
+            operator: contains
+            value: The Pussycat Dolls
+          - type: rule
+            field: artist
+            operator: contains
+            value: Fifth Harmony
+          - type: rule
+            field: artist
+            operator: contains
+            value: Spice Girls
+          - type: rule
+            field: artist
+            operator: contains
+            value: Girls Aloud
+
+  # Filter for female country-pop artists - 3+ stars and artist names
+  female-country-pop-artists:
+    match: all
+    rules:
+      - type: rule
+        field: rating
+        operator: ">="
+        value: 3.0
+      - type: group
+        match: any
+        rules:
+          - type: rule
+            field: artist
+            operator: contains
+            value: Taylor Swift
+          - type: rule
+            field: artist
+            operator: contains
+            value: Kacey Musgraves
+          - type: rule
+            field: artist
+            operator: contains
+            value: Carrie Underwood
+          - type: rule
+            field: artist
+            operator: contains
+            value: Shania Twain
+          - type: rule
+            field: artist
+            operator: contains
+            value: Faith Hill
+          - type: rule
+            field: artist
+            operator: contains
+            value: LeAnn Rimes
+          - type: rule
+            field: artist
+            operator: contains
+            value: Kelsea Ballerini
+          - type: rule
+            field: artist
+            operator: contains
+            value: Maren Morris
+          - type: rule
+            field: artist
+            operator: contains
+            value: Mickey Guyton
+          - type: rule
+            field: artist
+            operator: contains
+            value: Carly Pearce
+          - type: rule
+            field: artist
+            operator: contains
+            value: Gabby Barrett
+          - type: rule
+            field: artist
+            operator: contains
+            value: Maddie & Tae
+          - type: rule
+            field: artist
+            operator: contains
+            value: The Chicks
+          - type: rule
+            field: artist
+            operator: contains
+            value: Jessie James Decker
+          - type: rule
+            field: artist
+            operator: contains
+            value: Danielle Bradbery
+          - type: rule
+            field: artist
+            operator: contains
+            value: Cassadee Pope
+          - type: rule
+            field: artist
+            operator: contains
+            value: Ingrid Andress
+          - type: rule
+            field: artist
+            operator: contains
+            value: Lainey Wilson
+          - type: rule
+            field: artist
+            operator: contains
+            value: Priscilla Block
+          - type: rule
+            field: artist
+            operator: contains
+            value: Megan Moroney
+
+  # Filter for female R&B artists - 3+ stars and artist names
+  female-rnb-artists:
+    match: all
+    rules:
+      - type: rule
+        field: rating
+        operator: ">="
+        value: 3.0
+      - type: group
+        match: any
+        rules:
+          - type: rule
+            field: artist
+            operator: contains
+            value: SZA
+          - type: rule
+            field: artist
+            operator: contains
+            value: Summer Walker
+          - type: rule
+            field: artist
+            operator: contains
+            value: H.E.R.
+          - type: rule
+            field: artist
+            operator: contains
+            value: Jazmine Sullivan
+          - type: rule
+            field: artist
+            operator: contains
+            value: Kehlani
+          - type: rule
+            field: artist
+            operator: contains
+            value: Jhené Aiko
+          - type: rule
+            field: artist
+            operator: contains
+            value: Tinashe
+          - type: rule
+            field: artist
+            operator: contains
+            value: Victoria Monét
+          - type: rule
+            field: artist
+            operator: contains
+            value: Ella Mai
+          - type: rule
+            field: artist
+            operator: contains
+            value: Normani
+          - type: rule
+            field: artist
+            operator: contains
+            value: Kali Uchis
+          - type: rule
+            field: artist
+            operator: contains
+            value: Beyoncé
+          - type: rule
+            field: artist
+            operator: contains
+            value: Rihanna
+          - type: rule
+            field: artist
+            operator: contains
+            value: Alicia Keys
+          - type: rule
+            field: artist
+            operator: contains
+            value: Toni Braxton
+          - type: rule
+            field: artist
+            operator: contains
+            value: Brandy
+          - type: rule
+            field: artist
+            operator: contains
+            value: Monica
+          - type: rule
+            field: artist
+            operator: contains
+            value: Ashanti
+          - type: rule
+            field: artist
+            operator: contains
+            value: Mýa
+          - type: rule
+            field: artist
+            operator: contains
+            value: Ciara
+
+  # Rock artists - 3+ stars and rock artist names
+  rock-artists:
+    match: all
+    rules:
+      - type: rule
+        field: rating
+        operator: ">="
+        value: 3
+      - type: group
+        match: any
+        rules:
+          - type: rule
+            field: artist
+            operator: contains
+            value: Linkin Park
+
+  # Filter for pop diva tracks - high rating + pop genre
+  pop-divas:
+    match: all
+    rules:
+      - type: rule
+        field: rating
+        operator: ">="
+        value: 4.0
+      - type: group
+        match: any
+        rules:
+          - type: rule
+            field: genre
+            operator: contains
+            value: Pop
+          - type: rule
+            field: genre
+            operator: contains
+            value: Dance
+
+  # Filter for rock classic tracks - high rating + rock genres
+  rock-classics:
+    match: all
+    rules:
+      - type: rule
+        field: rating
+        operator: ">="
+        value: 4.0
+      - type: group
+        match: any
+        rules:
+          - type: rule
+            field: genre
+            operator: contains
+            value: Rock
+          - type: rule
+            field: genre
+            operator: contains
+            value: Hard Rock
+          - type: rule
+            field: genre
+            operator: contains
+            value: Classic Rock

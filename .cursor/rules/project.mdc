@@ -1,0 +1,30 @@
+---
+description: rfmedia-apps project rules
+globs: ["**/*"]
+alwaysApply: true
+---
+
+# rfmedia-apps
+
+A monorepo containing a Docker-based self-hosting platform (47 containerized applications) and
+TypeScript CLI tools for orchestration and media management.
+
+Full agent rules live in [`CLAUDE.md`](../../CLAUDE.md). Key points surfaced for Cursor:
+
+## Rules
+
+- Follow Conventional Commits for every commit:
+  `feat|fix|docs|refactor|perf|test|build|ci|chore(scope): …`.
+- Never commit `.env` / secrets / tokens.
+- Use `.github/ISSUE_TEMPLATE/*.yml` when present; link `Closes #…` in every PR.
+- Keep files around ~500 lines (soft cap). Refactor meaningful overruns into smaller modules.
+- Modular code: small cohesive units, DRY, composition over inheritance, single responsibility.
+- Prefer working in a git worktree for non-trivial changes —
+  `git worktree add ~/.claude-worktrees/<repo>-<branch>/`. Use the main checkout only for one-liners
+  or when worktree creation is blocked.
+- TypeScript: strict mode enabled, `PascalCase` components, `camelCase` hooks/functions, prefer
+  `unknown` over `any`.
+
+## Verification
+
+Run `npm test` and `npm run lint` before marking work complete.

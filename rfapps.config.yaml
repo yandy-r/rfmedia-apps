@@ -1,0 +1,233 @@
+# rfapps CLI Configuration
+# This is the default configuration file for the rfapps Docker orchestration CLI.
+# Users can override these settings by creating .rfapps.yaml in their project directory
+# or ~/.rfapps.yaml for global settings.
+
+# Default paths
+composePath: compose.yml
+envFile: .env.local
+
+# Service-to-sidecar mappings (Tailscale containers)
+# Disabled for this deployment — tailnet ingress uses Docktail labels instead of sidecars.
+sidecars:
+  enabled: false
+  mapping: {}
+
+# Predefined service groups for batch operations
+groups:
+  infra-stack:
+    - docktail
+    - tsdproxy-rfapps
+    - traefik
+    - cloudflared
+    - homarr
+    - uptime-kuma
+    - tokenhop
+    - headroom
+    - stirling-pdf
+    - speedtest-tracker
+    - ofelia
+    - forgejo
+    - forgejo-postgres
+    - forgejo-runner
+    - forgejo-runner-2
+    - forgejo-runner-3
+    - forgejo-itcn-runner
+    - forgejo-itcn-runner-2
+    - forgejo-itcn-runner-3
+  vpn-stack:
+    - slskd
+  media-stack:
+    - plex
+    - plex-music
+    - jellyfin
+    - plex-ratings-sync
+    - kometa
+    - tautulli
+    - plexseerr
+    - jellyseerr
+    - watchstate
+    - sonarr
+    - radarr
+    - lidarr
+    - bazarr
+  arr-stack:
+    - sonarr
+    - radarr
+    - lidarr
+    - bazarr
+    - prowlarr
+    - praxrr
+  download-stack:
+    - unpackerr
+    - autobrr
+    - sabnzbd
+    - slskd
+    - nzbget
+  auth-stack:
+    - authentik-server
+    - authentik-worker
+    - authentik-db
+    - authentik-redis
+    - authentik-media
+  photo-stack:
+    - immich-server
+    - immich-ml
+    - immich-redis
+    - immich-postgres
+
+# Service-to-profile mappings (Docker Compose profiles)
+profiles:
+  defaultProfile: all
+  validProfiles:
+    - core
+    - infrastructure
+    - downloads
+    - arr-stack
+    - media
+    - photos
+    - all
+  mapping:
+    # Core services
+    docktail: core
+    tsdproxy-rfapps: infrastructure
+    traefik: core
+    cloudflared: core
+    authentik-server: core
+    authentik-media: core
+    authentik-worker: core
+    authentik-db: core
+    authentik-redis: core
+    # Infrastructure
+    homarr: infrastructure
+    uptime-kuma: infrastructure
+    tokenhop: infrastructure
+    headroom: infrastructure
+    stirling-pdf: infrastructure
+    speedtest-tracker: infrastructure
+    ofelia: infrastructure
+    forgejo: infrastructure
+    forgejo-postgres: infrastructure
+    forgejo-runner: infrastructure
+    forgejo-runner-2: infrastructure
+    forgejo-runner-3: infrastructure
+    forgejo-itcn-runner: infrastructure
+    forgejo-itcn-runner-2: infrastructure
+    forgejo-itcn-runner-3: infrastructure
+    # Downloads
+    autobrr: downloads
+    sabnzbd: downloads
+    prowlarr: downloads
+    nzbget: downloads
+    slskd: downloads
+    unpackerr: downloads
+    # Arr-stack
+    notifiarr: arr-stack
+    bazarr: arr-stack
+    sonarr: arr-stack
+    radarr: arr-stack
+    lidarr: arr-stack
+    praxrr: arr-stack
+    arr-scripts: arr-stack
+    # Media
+    plex: media
+    plex-music: media
+    jellyfin: media
+    plex-ratings-sync: media
+    kometa: media
+    tautulli: media
+    plexseerr: media
+    jellyseerr: media
+    watchstate: media
+    # Photos
+    immich-server: photos
+    immich-ml: photos
+    immich-redis: photos
+    immich-postgres: photos
+
+# Health check configuration
+healthCheck:
+  timeout: 60
+  interval: 5
+  retries: 12
+  waitForReady: true
+
+# Parallel execution configuration
+parallel:
+  enabled: true
+  workers: 4
+
+# Docker configuration
+docker:
+  sshRetry:
+    maxRetries: 3
+    delayMs: 2000
+
+# Environment tool configuration
+envTool:
+  tool: op
+
+# Interactive selection configuration
+interactive:
+  # Number of services visible in the selection menu
+  pageSize: 20
+
+# Production-readiness lint suppressions
+# Plex GPU workloads (plex, plex-music): memory limits are host-dependent
+lint:
+  ignore:
+    - rule: resource-limits-missing
+      service: plex
+    - rule: resource-limits-missing
+      service: plex-music
+
+# Image vulnerability scanning (opt-in per invocation via --scan)
+# scan:
+#   scanner: trivy
+#   failOn: none
+#   ignore:
+#     - id: CVE-2024-56171
+#       service: plex
+#       reason: "no upstream fix in the linuxserver image; not reachable in this configuration"
+#       until: "2026-12-31"
+
+# Security hardening rule suppressions (`rfapps harden`)
+# harden:
+#   includeReview: false
+#   backup: true
+#   ignore:
+#     - rule: harden-memory-limit
+#       service: plex # GPU workload; limits are host-dependent
+#     - rule: harden-run-as-non-root
+#       service: traefik # binds :80/:443
+
+# Hierarchical service tags (`rfapps tag`, `--tag` on every targeting command)
+#
+# Service-keyed, mirroring profiles.mapping and sidecars.mapping.
+# Store LEAF paths only — ancestors are derived automatically, so a service
+# tagged `infrastructure/core/networking` also matches `infrastructure/core`
+# and `infrastructure`. `--tag infrastructure` reaches the whole subtree;
+# a trailing `/*` (`infrastructure/*`) is rejected at parse time.
+#
+# Layering REPLACES, it does not merge: a `tags:` block in any higher-precedence
+# layer (.rfapps.yaml, ~/.rfapps.yaml) wholly shadows this one.
+#
+# Generate a starting point with `rfapps tag suggest --out tags.yaml`.
+# tags:
+#   mapping:
+#     traefik:
+#       - infrastructure/core/networking
+#       - network/ingress
+#     authentik-server:
+#       - infrastructure/core/identity
+#     plex:
+#       - media/streaming
+#       - hardware/gpu
+#     sonarr:
+#       - media/automation/tv
+#     radarr:
+#       - media/automation/movies
+#     sabnzbd:
+#       - media/downloads/usenet
+#     immich-server:
+#       - photos/library

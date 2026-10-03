@@ -1,0 +1,37 @@
+# lefthook.yml — git hook manager for rfmedia-apps
+#
+# Install with ./scripts/install-lefthook.sh (bootstraps the binary and runs
+# `lefthook install` to wire .git/hooks). See docs/lefthook-usage.md for details.
+#
+# Bypass a hook once:   git commit --no-verify / git push --no-verify
+# Skip in CI:           lefthook checks CI=true automatically; no config needed.
+
+pre-commit:
+  parallel: true
+  commands:
+    # Format staged files with Prettier (the repo's established formatter).
+    # Honors .prettierignore; --ignore-unknown skips file types Prettier can't parse.
+    prettier:
+      run: npx --no -- prettier --write --ignore-unknown {staged_files}
+      glob: "*.{ts,tsx,js,jsx,mjs,cjs,mts,cts,json,jsonc,css,md,yml,yaml}"
+      stage_fixed: true
+
+pre-push:
+  commands:
+    # Run the full suite once per push. Use fail-fast `npm run test:run`
+    # (sequential && across workspaces) so a failed package is the last
+    # thing printed — npm's multi `-w` mode otherwise continues and buries
+    # the failure under a later green summary.
+    # `npm test` must never be used here if it is watch mode.
+    test:
+      run: npm run test:run
+      # Full monorepo suite is routinely 30–45s; keep headroom for loaded hosts.
+      timeout: 10m
+
+# Requires devDependencies @commitlint/cli + @commitlint/config-conventional
+# (see commitlint.config.cjs). Install before this hook can run:
+#   npm add -D @commitlint/cli @commitlint/config-conventional
+commit-msg:
+  commands:
+    commitlint:
+      run: npx --no -- commitlint --edit {1}

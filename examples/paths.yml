@@ -1,0 +1,229 @@
+# Example paths YAML file for rfmedia CLI
+#
+# This file demonstrates all available options including:
+# - defaults section for common settings
+# - per-source overrides for filter, outputFolder, convert
+# - range and count options for controlling copy count
+# - automatic filter mode detection when filters are present
+# - groups field for source selection with --group
+# - artist field for source selection with --artist
+#
+# Usage:
+#   rfmedia copy --paths examples/paths.yml
+#     → Auto-detects filter mode because 'filter' is specified in defaults/sources
+#
+#   rfmedia copy --filter liked --paths examples/paths.yml
+#     → Explicit filter mode with CLI filter as fallback for sources without one
+#
+#   rfmedia sync --paths examples/paths.yml
+#     → Sync with automatic filter mode detection
+#
+# Source Selection:
+#   rfmedia copy --paths examples/paths.yml --source-idx 2
+#     → Process only source at index 2 (1-based)
+#
+#   rfmedia copy --paths examples/paths.yml --source-idx 1,3-5
+#     → Process sources at indices 1, 3, 4, and 5
+#
+#   rfmedia copy --paths examples/paths.yml --source-name britney
+#     → Unified search: matches groups, artist, or basename (case-insensitive)
+#
+#   rfmedia copy --paths examples/paths.yml --group pop-divas
+#     → Process all sources in the "pop-divas" group
+#
+#   rfmedia copy --paths examples/paths.yml --artist "britney,taylor"
+#     → Process sources matching artist "britney" or "taylor"
+#
+# Selection options can be combined (intersection):
+#   rfmedia copy --paths examples/paths.yml --group pop-divas --artist shakira
+#     → Process Shakira from the pop-divas group
+
+destination: /data/media/music-manual
+# destination: /data/media/music-temp
+
+# Defaults apply to all sources unless overridden per-source
+# Available defaults: filter, count, range, outputFolder, convert
+defaults:
+  filter: liked
+  count: 5
+  outputFolder: liked-songs
+
+sources:
+  # Source 1: Custom group for selection (--group music-library)
+  - artist: Music Library
+    groups:
+      - root
+    media: music
+    type: directory
+    path: /data/media/music
+    filter: high-quality-rock
+    range: 001-005
+
+  # Source 2: Group "pop-divas" (--group pop-divas or --artist britney)
+  - artist: Britney Spears
+    groups:
+      - pop-divas
+      - pop
+      - non-root
+    type: directory
+    media: music
+    path: /data/media/music/Britney Spears (45a663b5-b1cb-4a91-bff6-2bef7bbfdd76)
+    count: 5
+    # convert: alac
+
+  # Source 3: Same group, different artist (--group pop-divas or --artist mariah)
+  - artist: Mariah Carey
+    groups:
+      - pop-divas
+      - pop
+      - non-root
+    type: directory
+    media: music
+    path: /data/media/music/Mariah Carey (494e8d09-f85b-4543-892f-a5096aed1cd4)
+    count: 5
+
+  - artist: Christina Aguilera
+    groups:
+      - pop-divas
+      - pop
+      - non-root
+    type: directory
+    media: music
+    path: /data/media/music/Christina Aguilera (b202beb7-99bd-47e7-8b72-195c8d72ebdd)
+    # outputFolder: rock-tracks
+
+  - artist: Jessica Simpson
+    groups:
+      - pop-divas
+      - pop
+      - non-root
+    type: directory
+    media: music
+    path: /data/media/music/Jessica Simpson (fe37acd4-893c-4b2c-8ad2-7fd394280354)
+
+  - artist: Katy Perry
+    groups:
+      - pop-divas
+      - pop
+      - non-root
+    type: directory
+    media: music
+    path: /data/media/music/Katy Perry (122d63fc-8671-43e4-9752-34e846d62a9c)
+
+  # Source 7: Multiple groups - belongs to TWO groups
+  # Can be selected by: --group pop-divas, --group latin-divas, or --artist shakira
+  - artist: Shakira
+    groups:
+      - pop-divas
+      - pop
+      - latin-pop
+      - latin-divas
+      - non-root
+    type: directory
+    media: music
+    path: /data/media/music/Shakira (bf24ca37-25f4-4e34-9aec-460b94364cfc)
+
+  # Source 8: Group "pop-divas" (--group pop-divas or --artist nelly furtado)
+  - artist: Nelly Furtado
+    groups:
+      - pop-divas
+      - pop
+      - non-root
+    type: directory
+    media: music
+    path: /data/media/music/Nelly Furtado (13655113-cd16-4b43-9dca-cadbbf26ee05)
+    count: 5
+    # convert: alac
+
+  # Source 9: Group "pop-divas" (--group pop-divas or --artist pussycat dolls)
+  - artist: The Pussycat Dolls
+    groups:
+      - pop-divas
+      - pop
+      - non-root
+    type: directory
+    media: music
+    path: /data/media/music/The Pussycat Dolls (1fda852b-92e9-4562-82fa-c52820a77b23)
+    count: 5
+    # convert: alac
+
+  # Source 10: Group "pop-divas" (--group pop-divas or --artist Nicole Scherzinger)
+  - artist: Nicole Scherzinger
+    groups:
+      - pop-divas
+      - pop
+      - non-root
+    type: directory
+    media: music
+    path: /data/media/music/Nicole Scherzinger (0f7534a6-dc5f-46ca-a2e0-13d214cdd52b)
+    count: 5
+    # convert: alac
+
+  - artist: Taylor Swift
+    groups:
+      - pop
+      - non-root
+    type: directory
+    media: music
+    path: /data/media/music/Taylor Swift (20244d07-534f-4eff-b4d4-930878889970)
+
+  - artist: Evanescence
+    groups:
+      - rock-favorites
+      - rock
+      - non-root
+    type: directory
+    media: music
+    path: /data/media/music/Evanescence (f4a31f0a-51dd-4fa7-986d-3095c40c5ed9)
+    count: 7
+
+  - artist: Linkin Park
+    groups:
+      - rock-favorites
+      - rock
+      - metal
+      - non-root
+    type: directory
+    media: music
+    path: /data/media/music/Linkin Park (f59c5520-5f46-4d2c-b2c4-822eabf53419)
+
+  - artist: Disturbed
+    groups:
+      - rock-favorites
+      - rock
+      - metal
+      - non-root
+    type: directory
+    media: music
+    path: /data/media/music/Disturbed (4bb4e4e4-5f66-4509-98af-62dbb90c45c5)
+
+  - artist: Avril Lavigne
+    groups:
+      - rock-favorites
+      - rock
+      - pop-rock
+      - non-root
+    type: directory
+    media: music
+    path: /data/media/music/Avril Lavigne (0103c1cc-4a09-4a5d-a344-56ad99a77193)
+    # convert: mp3
+
+  # Source 13: Latin-divas group (--group latin-divas or --artist paulina)
+  - artist: Paulina Rubio
+    groups:
+      - pop
+      - latin-pop
+      - latin-divas
+      - non-root
+    type: directory
+    media: music
+    path: /data/media/music/Paulina Rubio (5938c629-1d06-480b-9780-859b153af11e)
+
+  - artist: Selena Gomez
+    groups:
+      - pop-divas
+      - pop
+      - non-root
+    type: directory
+    media: music
+    path: /data/media/music/Selena Gomez (e4bc69e2-a064-4f93-ada1-f7f209cc1cc3)

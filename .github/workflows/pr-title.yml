@@ -1,0 +1,58 @@
+# Validates PR titles as Conventional Commits and rejects placeholder subjects
+# like "[WIP]" / "Draft:" / "Initial plan" that agents sometimes open PRs with.
+#
+# Rationale and full contributor guidance:
+#   - .github/copilot-instructions.md  (PR-workflow essentials for code agents)
+#   - CLAUDE.md / AGENTS.md            (canonical project rules)
+#
+# The PR title becomes the squash-merge commit subject verbatim and lands in
+# CHANGELOG.md / git log as-is — that's why this check is required to merge.
+#
+# Inline shell validation is used instead of amannn/action-semantic-pull-request
+# so Forgejo Actions does not need to clone third-party actions from GitHub
+# (DEFAULT_ACTIONS_URL only mirrors select actions/* repos on data.forgejo.org).
+name: PR title
+
+on:
+  pull_request_target:
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  pull-requests: read
+
+concurrency:
+  group: pr-title-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Validate Conventional Commit PR title
+    if: contains(github.server_url, 'github.com')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate Conventional Commit PR title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          set -euo pipefail
+
+          types='feat|fix|docs|refactor|perf|test|build|ci|chore|style'
+          cc_pattern="^(${types})(\\([^)]+\\))?!?: .+"
+
+          if ! printf '%s' "$PR_TITLE" | grep -Eq "$cc_pattern"; then
+            echo "::error::PR title must be a Conventional Commit (e.g. feat(scope): subject)."
+            echo "Got: $PR_TITLE"
+            exit 1
+          fi
+
+          subject="$(printf '%s' "$PR_TITLE" | sed -E "s/^(${types})(\\([^)]+\\))?!?: //")"
+          placeholder_pattern='^(\[WIP\]|\[Draft\]|Initial plan|WIP:|Draft:)'
+          if printf '%s' "$subject" | grep -Eq "$placeholder_pattern"; then
+            echo "::error::PR title subject looks like a placeholder: $subject"
+            echo 'Remove "[WIP]" / "[Draft]" / "Draft:" / "WIP:" / "Initial plan"'
+            echo "and use a Conventional Commit title — the PR title becomes the"
+            echo "squash-merge commit subject and lands in CHANGELOG.md verbatim."
+            exit 1
+          fi
+
+          echo "PR title is valid: $PR_TITLE"

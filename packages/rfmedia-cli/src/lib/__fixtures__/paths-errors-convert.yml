@@ -1,0 +1,6 @@
+destination: /data/media/music-manual
+sources:
+  - artist: Britney Spears
+    path: /data/media/music/Britney Spears (45a663b5-b1cb-4a91-bff6-2bef7bbfdd76)
+    count: 1
+    convert: mp3
