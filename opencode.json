@@ -15,6 +15,10 @@
       "playwright": {
         "type": "local",
         "command": ["npx", "-y", "@playwright/mcp@latest"]
+      },
+      "notion-itcn": {
+        "type": "remote",
+        "url": "https://mcp.notion.com/mcp"
       }
     }
   }
