@@ -8,10 +8,12 @@ composePath: compose.yml
 envFile: .env.local
 
 # Service-to-sidecar mappings (Tailscale containers)
-# Disabled for this deployment — tailnet ingress uses Docktail labels instead of sidecars.
+# traefik runs behind the traefik-ts sidecar (network_mode: service:traefik-ts).
+# Docktail remains deployed but no longer advertises traefik.
 sidecars:
-  enabled: false
-  mapping: {}
+  enabled: true
+  mapping:
+    traefik: traefik-ts
 
 # Predefined service groups for batch operations
 groups:
@@ -93,6 +95,7 @@ profiles:
     docktail: core
     tsdproxy-rfapps: infrastructure
     traefik: core
+    traefik-ts: core
     cloudflared: core
     authentik-server: core
     authentik-media: core

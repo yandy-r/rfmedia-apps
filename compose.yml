@@ -102,12 +102,40 @@ services:
       - 'host.docker.internal:host-gateway'
     image: almeidapaulopt/tsdproxy:2
 
+  traefik-ts:
+    hostname: traefik-ts
+    container_name: traefik-ts
+    restart: unless-stopped
+    networks:
+      apps:
+        aliases:
+          - traefik
+    logging: *logging-default
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    cap_add:
+      - net_admin
+    healthcheck:
+      test: ["CMD-SHELL", "tailscale status --json >/dev/null 2>&1"]
+      interval: 20s
+      retries: 5
+      start_period: 40s
+      timeout: 10s
+    environment:
+      TS_AUTHKEY: ${TS_AUTHKEY}
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_USERSPACE: false
+      TS_ACCEPT_DNS: false
+      TS_EXTRA_ARGS: --accept-routes=false --accept-dns=false --advertise-tags=tag:docker,tag:network
+      TS_HOSTNAME: traefik
+    volumes:
+      - ${DOCKER_DIR}/traefik-ts:/var/lib/tailscale
+    image: tailscale/tailscale:latest
+
   traefik:
     <<: *service-base
     container_name: traefik
-    hostname: traefik
-    networks:
-      apps: {}
+    network_mode: service:traefik-ts
     logging: *logging-default
     healthcheck:
       test: wget --no-verbose --tries=1 --spider http://localhost:8080 || exit 1
@@ -124,6 +152,8 @@ services:
       HOMEAUTO_SERVER: ${HOMEAUTO_SERVER}
       NAS01_IP: ${NAS01_IP}
       NAS02_IP: ${NAS02_IP}
+      UNIFI_GW_IP: ${UNIFI_GW_IP}
+      OC_UBDEVSRV_URL: ${OC_UBDEVSRV_URL}
     command:
       - --log
       - --log.level=${LOG_LEVEL:-INFO}
@@ -161,17 +191,12 @@ services:
       traefik.http.services.api.loadbalancer.server.port: 8080
       traefik.http.services.api.loadbalancer.server.scheme: http
       traefik.http.routers.api.middlewares: authentik-dev@docker
-      docktail.service.enable: true
-      docktail.service.name: traefik
-      docktail.service.port: 443
-      docktail.service.protocol: tcp
-      docktail.service.service-port: 443
-      docktail.service.service-protocol: tcp
-      docktail.service.network: apps
+    depends_on:
+      - traefik-ts
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ${DOCKER_DIR}/traefik:/etc/traefik
-      - ./config/traefik:/etc/traefik/dynamic
+      - ${DOCKER_DIR}/traefik/config:/etc/traefik/dynamic
     image: traefik:v3
 
   cloudflared:
