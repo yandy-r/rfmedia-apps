@@ -154,6 +154,8 @@ services:
       NAS02_IP: ${NAS02_IP}
       UNIFI_GW_IP: ${UNIFI_GW_IP}
       OC_UBDEVSRV_URL: ${OC_UBDEVSRV_URL}
+      OC_UBSRV_URL: ${OC_UBSRV_URL}
+      OC_G7_URL: ${OC_G7_URL}
     command:
       - --log
       - --log.level=${LOG_LEVEL:-INFO}
