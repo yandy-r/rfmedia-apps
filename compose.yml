@@ -929,7 +929,7 @@ services:
       - ${DOCKER_DIR}/sabnzbd:/config
       - ${DATA_DIR}/usenet:/data/usenet:rw
     image: lscr.io/linuxserver/sabnzbd:unstable
-    # image: ghcr.io/hotio/sabnzbd:latest
+  # image: ghcr.io/hotio/sabnzbd:latest
 
   nzbget:
     <<: *service-base
@@ -966,7 +966,7 @@ services:
       - ${DOCKER_DIR}/nzbget:/config
       - ${DATA_DIR}/usenet:/data/usenet:rw
     image: lscr.io/linuxserver/nzbget:latest
-    # image: ghcr.io/hotio/nzbget:latest
+  # image: ghcr.io/hotio/nzbget:latest
 
   qbittorrent:
     <<: *service-base
@@ -1110,7 +1110,7 @@ services:
       qbittorrent:
         condition: service_healthy
     image: lscr.io/linuxserver/prowlarr:develop
-    # image: ghcr.io/hotio/prowlarr:testing
+  # image: ghcr.io/hotio/prowlarr:testing
 
   unpackerr:
     <<: *service-base
@@ -1230,7 +1230,7 @@ services:
       - ${DOCKER_DIR}/bazarr:/config
       - ${DATA_DIR}/media:/data/media
     image: lscr.io/linuxserver/bazarr:development
-    # image: ghcr.io/hotio/bazarr:nightly
+  # image: ghcr.io/hotio/bazarr:nightly
 
   arr-scripts:
     <<: *service-base
@@ -1290,7 +1290,7 @@ services:
       qbittorrent:
         condition: service_healthy
     image: lscr.io/linuxserver/sonarr:develop
-    # image: ghcr.io/hotio/sonarr:nightly
+  # image: ghcr.io/hotio/sonarr:nightly
 
   radarr:
     <<: *service-base
@@ -1332,7 +1332,7 @@ services:
       qbittorrent:
         condition: service_healthy
     image: lscr.io/linuxserver/radarr:develop
-    # image: ghcr.io/hotio/radarr:testing
+  # image: ghcr.io/hotio/radarr:testing
 
   lidarr:
     <<: *service-base
@@ -1354,8 +1354,8 @@ services:
       timeout: 5s
     environment:
       <<: *common-env
-      # DOCKER_MODS: ghcr.io/themepark-dev/theme.park:lidarr
-      # TP_THEME: ${TP_THEME}
+    # DOCKER_MODS: ghcr.io/themepark-dev/theme.park:lidarr
+    # TP_THEME: ${TP_THEME}
     labels:
       traefik.enable: true
       traefik.http.routers.lidarr.rule: Host(`lidarr.${DOMAIN2}`)
@@ -1479,12 +1479,12 @@ services:
       PLEX_ADVERTISE_URL: ${PLEX_ADVERTISE_URL}
       DOCKER_MODS: ghcr.io/themepark-dev/theme.park:plex|linuxserver/mods:plex-absolute-hama|linuxserver/mods:plex-audnexus
       TP_THEME: ${TP_THEME}
-      #-------------------------------------------------------------------------
-      # If you have an nvidia GPU
-      #-------------------------------------------------------------------------
-      # NVIDIA_VISIBLE_DEVICES: all
-      # NVIDIA_DRIVER_CAPABILITIES: compute,video,utility
-      #-------------------------------------------------------------------------
+    #-------------------------------------------------------------------------
+    # If you have an nvidia GPU
+    #-------------------------------------------------------------------------
+    # NVIDIA_VISIBLE_DEVICES: all
+    # NVIDIA_DRIVER_CAPABILITIES: compute,video,utility
+    #-------------------------------------------------------------------------
     labels:
       traefik.enable: true
       traefik.http.routers.plex.rule: Host(`plex.${DOMAIN2}`)
@@ -1695,7 +1695,7 @@ services:
       - /etc/localtime:/etc/localtime:ro
       - ${DOCKER_DIR}/tautulli:/config
     image: lscr.io/linuxserver/tautulli:develop
-    # image: ghcr.io/hotio/tautulli:testing
+  # image: ghcr.io/hotio/tautulli:testing
 
   plexseerr:
     <<: *service-base
