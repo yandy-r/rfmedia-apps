@@ -40,6 +40,7 @@ groups:
     - forgejo-itcn-runner-3
   vpn-stack:
     - slskd
+    - qbittorrent
   media-stack:
     - plex
     - plex-music
@@ -67,6 +68,7 @@ groups:
     - sabnzbd
     - slskd
     - nzbget
+    - qbittorrent
   auth-stack:
     - authentik-server
     - authentik-worker
@@ -125,6 +127,7 @@ profiles:
     prowlarr: downloads
     nzbget: downloads
     slskd: downloads
+    qbittorrent: downloads
     unpackerr: downloads
     # Arr-stack
     notifiarr: arr-stack
