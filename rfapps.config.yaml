@@ -26,7 +26,6 @@ groups:
     - uptime-kuma
     - tokenhop
     - headroom
-    - llama
     - stirling-pdf
     - speedtest-tracker
     - ofelia
@@ -109,7 +108,6 @@ profiles:
     uptime-kuma: infrastructure
     tokenhop: infrastructure
     headroom: infrastructure
-    llama: infrastructure
     stirling-pdf: infrastructure
     speedtest-tracker: infrastructure
     ofelia: infrastructure
