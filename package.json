@@ -1,6 +1,6 @@
 {
   "name": "rfmedia-apps",
-  "version": "0.4.7",
+  "version": "0.4.8",
   "private": true,
   "description": "A collection of self hosted web applications for family use.",
   "engines": {
