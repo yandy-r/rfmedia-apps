@@ -38,7 +38,7 @@ A TypeScript CLI tool for music library management. This tool replaces the legac
 
 ### Prerequisites
 
-- Node.js 22.0.0 or later
+- Node.js 22.23.4 or later
 - npm or another package manager
 - ffmpeg (required for audio conversion with `--convert`)
 

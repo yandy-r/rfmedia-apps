@@ -2785,7 +2785,7 @@ npm run clean
 
 ## Requirements
 
-- Node.js >= 22.0.0
+- Node.js >= 22.23.4
 - Docker and Docker Compose
 - Access to compose.yml and environment files
 

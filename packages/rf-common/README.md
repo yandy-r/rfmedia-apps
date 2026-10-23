@@ -591,7 +591,7 @@ import { checkDotenvx, checkOp, envFileExists } from "@rfmedia/common/env-tools"
 
 ### Prerequisites
 
-- Node.js 22+
+- Node.js >= 22.23.4
 - npm 10+
 
 ### Scripts

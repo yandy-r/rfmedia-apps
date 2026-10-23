@@ -36,7 +36,7 @@ new audio bytes.
 
 ## Dependencies
 
-- Node.js 22 or later, as required by the CLI package.
+- Node.js >= 22.23.4, as required by the CLI package.
 - `ffmpeg` available in `PATH`, with the selected encoder enabled.
 - Linux or macOS for descriptor-backed conversion publication. Conversion fails closed on hosts
   that cannot expose inherited file descriptors to FFmpeg and the isolated MP3 rating worker.

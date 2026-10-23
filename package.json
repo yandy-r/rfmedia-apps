@@ -4,7 +4,11 @@
   "private": true,
   "description": "A collection of self hosted web applications for family use.",
   "engines": {
-    "node": ">=24.x"
+    "node": ">=24.22.1"
+  },
+  "overrides": {
+    "markdown-it": "14.3.3",
+    "vite": "7.3.7"
   },
   "workspaces": [
     "packages/*"

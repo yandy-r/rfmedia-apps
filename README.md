@@ -13,7 +13,7 @@ git clone git@github.com:yandy-r/rfmedia-apps.git
 
 cd rfmedia-apps
 
-# Use Node.js 22 (mise reads the repository's .mise.toml automatically)
+# Use Node.js 24.22.1 (mise reads the repository's .mise.toml automatically)
 
 # Configure environment
 cp .env.example .env.local
