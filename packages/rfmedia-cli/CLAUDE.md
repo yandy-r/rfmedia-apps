@@ -10,7 +10,7 @@ rfmedia-cli is a TypeScript CLI tool for music library management that replaces 
 
 - **Language**: TypeScript with ES2023 target
 - **Module System**: ESM with NodeNext resolution (`.js` extensions required in imports)
-- **Runtime**: Node.js 22+
+- **Runtime**: Node.js >= 22.23.4
 - **CLI Framework**: Commander.js v14
 - **Key Dependencies**:
   - `music-metadata` - Audio file metadata/rating reading

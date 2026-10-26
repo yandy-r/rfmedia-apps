@@ -9,11 +9,16 @@ Before you begin, ensure you have the following installed and configured on your
 
 ### Required Software
 
-| Software       | Minimum Version | Purpose                 |
-| -------------- | --------------- | ----------------------- |
-| Docker         | 24.0+           | Container runtime       |
-| Docker Compose | 2.20+           | Container orchestration |
-| Git            | 2.30+           | Repository management   |
+| Software       | Minimum Version | Purpose                         |
+| -------------- | --------------- | ------------------------------- |
+| Docker         | 24.0+           | Container runtime               |
+| Docker Compose | 2.20+           | Container orchestration         |
+| Git            | 2.30+           | Repository management           |
+| Node.js        | 24.22.1         | Monorepo install and rfapps CLI |
+
+`mise` installs Node.js 24.22.1 from `.mise.toml`. The root `package.json` `engines` field requires
+`>=24.22.1`. The CLI packages declare `>=22.23.4`; installing them from this repository still uses
+the monorepo floor.
 
 ### Secret Management (choose one)
 
@@ -54,6 +59,10 @@ docker compose version
 # Check Git version
 git --version
 # Expected: git version 2.30.x or higher
+
+# Check Node.js version
+node --version
+# Expected: v24.22.1 or newer
 
 # Check dotenvx (if using)
 dotenvx --version

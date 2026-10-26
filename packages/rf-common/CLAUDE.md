@@ -13,7 +13,7 @@ handling across CLI applications.
 
 - **Language**: TypeScript with ES2023 target
 - **Module System**: ESM with NodeNext resolution (`.js` extensions required in imports)
-- **Runtime**: Node.js 22+
+- **Runtime**: Node.js >= 22.23.4
 - **Key Dependencies**:
   - `listr2` - Task list rendering with spinners
   - `picocolors` - Terminal colors (fast, lightweight)

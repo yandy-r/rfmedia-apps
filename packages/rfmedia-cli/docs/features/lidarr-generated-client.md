@@ -26,7 +26,7 @@ the bounded reconstructed response.
 ## TsArr Evaluation
 
 `tsarr@2.12.0` was evaluated in a temporary directory and was not added to the package or lockfile.
-It declares Node `>=24.16.0`, while rfmedia supports Node `>=22.0.0`. A Node `v22.23.1` probe did
+It declares Node `>=24.16.0`, while rfmedia supports Node `>=22.23.4`. A Node `v22.23.1` probe did
 successfully import and construct the client and complete a mocked request, but an accidental smoke
 success is not a supported runtime contract.
 

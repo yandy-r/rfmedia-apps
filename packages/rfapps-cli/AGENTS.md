@@ -14,7 +14,7 @@ capabilities, and automatic Tailscale sidecar linking.
 
 - **Language**: TypeScript with ES2022 target
 - **Module System**: ESM with NodeNext resolution (`.js` extensions required in imports)
-- **Runtime**: Node.js 22+
+- **Runtime**: Node.js >= 22.23.4
 - **CLI Framework**: Commander.js v14
 - **Key Dependencies**:
   - `better-sqlite3` - SQLite database for deployment state persistence
