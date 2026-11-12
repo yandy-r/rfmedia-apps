@@ -166,10 +166,11 @@ or routing may fail.
 ## Deployment
 
 Forgejo is optional. `forgejo`, `forgejo-postgres`, and every `forgejo-*runner*` service carry
-the Compose profiles `forgejo` and `all`, so a bare `docker compose up -d` (no profile) skips them.
-Enable them with `--profile forgejo` (or `--profile all`, or `COMPOSE_PROFILES=forgejo`). The
-`rfapps` CLI maps these services to the `forgejo` profile and activates it automatically when you
-target them.
+only the Compose profile `forgejo` (deliberately not `all`), so neither a bare
+`docker compose up -d` nor `--profile all` / a whole-project `rfapps deploy` starts them. Enable
+them with `--profile forgejo` (or `COMPOSE_PROFILES=forgejo`). The `rfapps` CLI maps these services
+to the `forgejo` profile and activates it automatically when you target them, e.g.
+`rfapps deploy -g forgejo-stack --yes`.
 
 Deploy Forgejo and its dependencies using the `rfapps` CLI:
 
