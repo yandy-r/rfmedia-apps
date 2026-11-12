@@ -58,7 +58,8 @@ Groups in `rfapps.config.yaml` list main services only (no `*-ts` entries):
 
 | Group            | Services Included                                                                                                                  |
 | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `infra-stack`    | docktail, traefik, cloudflared, homarr, uptime-kuma, stirling-pdf, speedtest-tracker, ofelia, forgejo                              |
+| `infra-stack`    | docktail, traefik, cloudflared, homarr, uptime-kuma, stirling-pdf, speedtest-tracker, ofelia                                       |
+| `forgejo-stack`  | forgejo, forgejo-postgres, forgejo-runner(-2/-3), forgejo-itcn-runner(-2/-3)                                                       |
 | `vpn-stack`      | slskd                                                                                                                              |
 | `download-stack` | unpackerr, autobrr, sabnzbd, slskd, nzbget                                                                                         |
 | `arr-stack`      | sonarr, radarr, lidarr, bazarr, prowlarr                                                                                           |

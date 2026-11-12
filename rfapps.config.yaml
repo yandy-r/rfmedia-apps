@@ -29,6 +29,7 @@ groups:
     - stirling-pdf
     - speedtest-tracker
     - ofelia
+  forgejo-stack:
     - forgejo
     - forgejo-postgres
     - forgejo-runner
@@ -90,6 +91,7 @@ profiles:
     - arr-stack
     - media
     - photos
+    - forgejo
     - all
   mapping:
     # Core services
@@ -111,14 +113,15 @@ profiles:
     stirling-pdf: infrastructure
     speedtest-tracker: infrastructure
     ofelia: infrastructure
-    forgejo: infrastructure
-    forgejo-postgres: infrastructure
-    forgejo-runner: infrastructure
-    forgejo-runner-2: infrastructure
-    forgejo-runner-3: infrastructure
-    forgejo-itcn-runner: infrastructure
-    forgejo-itcn-runner-2: infrastructure
-    forgejo-itcn-runner-3: infrastructure
+    # Forgejo (optional: compose profile `forgejo`)
+    forgejo: forgejo
+    forgejo-postgres: forgejo
+    forgejo-runner: forgejo
+    forgejo-runner-2: forgejo
+    forgejo-runner-3: forgejo
+    forgejo-itcn-runner: forgejo
+    forgejo-itcn-runner-2: forgejo
+    forgejo-itcn-runner-3: forgejo
     # Downloads
     autobrr: downloads
     sabnzbd: downloads

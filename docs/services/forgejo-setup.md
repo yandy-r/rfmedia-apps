@@ -165,6 +165,12 @@ or routing may fail.
 
 ## Deployment
 
+Forgejo is optional. `forgejo`, `forgejo-postgres`, and every `forgejo-*runner*` service carry
+the Compose profiles `forgejo` and `all`, so a bare `docker compose up -d` (no profile) skips them.
+Enable them with `--profile forgejo` (or `--profile all`, or `COMPOSE_PROFILES=forgejo`). The
+`rfapps` CLI maps these services to the `forgejo` profile and activates it automatically when you
+target them.
+
 Deploy Forgejo and its dependencies using the `rfapps` CLI:
 
 ```bash
@@ -174,8 +180,8 @@ rfapps deploy -s forgejo --yes
 # Or rebuild after compose changes
 rfapps rebuild -s forgejo --yes
 
-# Or deploy the full infrastructure group
-rfapps deploy -g infra-stack --yes
+# Or deploy the whole Forgejo group (server, database, runners)
+rfapps deploy -g forgejo-stack --yes
 
 # Verify health
 rfapps health -s forgejo-postgres --wait-for-ready
@@ -433,8 +439,8 @@ rfapps deploy -s forgejo --yes
 rfapps deploy -s forgejo-runner-dind --yes
 rfapps deploy -s forgejo-runner --yes
 
-# Or deploy the full infrastructure group (includes runner + DinD)
-rfapps deploy -g infra-stack --yes
+# Or deploy the whole Forgejo group (server, database, runners)
+rfapps deploy -g forgejo-stack --yes
 
 docker logs forgejo-runner
 ```

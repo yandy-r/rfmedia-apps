@@ -572,6 +572,7 @@ services:
 
   forgejo-postgres:
     <<: *service-base
+    profiles: [forgejo, all]
     container_name: forgejo-postgres
     hostname: forgejo-postgres
     networks:
@@ -593,6 +594,7 @@ services:
 
   forgejo:
     <<: *service-base
+    profiles: [forgejo, all]
     container_name: forgejo
     hostname: forgejo
     networks:
@@ -646,6 +648,7 @@ services:
 
   forgejo-runner:
     <<: *service-base
+    profiles: [forgejo, all]
     container_name: forgejo-runner
     hostname: forgejo-runner
     user: "${PUID}:${PGID}"
@@ -671,6 +674,7 @@ services:
 
   forgejo-runner-2:
     <<: *service-base
+    profiles: [forgejo, all]
     container_name: forgejo-runner-2
     hostname: forgejo-runner-2
     user: "${PUID}:${PGID}"
@@ -696,6 +700,7 @@ services:
 
   forgejo-runner-3:
     <<: *service-base
+    profiles: [forgejo, all]
     container_name: forgejo-runner-3
     hostname: forgejo-runner-3
     user: "${PUID}:${PGID}"
@@ -721,6 +726,7 @@ services:
 
   forgejo-itcn-runner:
     <<: *service-base
+    profiles: [forgejo, all]
     container_name: forgejo-itcn-runner
     hostname: forgejo-itcn-runner
     user: "${PUID}:${PGID}"
@@ -747,6 +753,7 @@ services:
   # itcn runner 2
   forgejo-itcn-runner-2:
     <<: *service-base
+    profiles: [forgejo, all]
     container_name: forgejo-itcn-runner-2
     hostname: forgejo-itcn-runner-2
     user: "${PUID}:${PGID}"
@@ -773,6 +780,7 @@ services:
   # itcn runner 3
   forgejo-itcn-runner-3:
     <<: *service-base
+    profiles: [forgejo, all]
     container_name: forgejo-itcn-runner-3
     hostname: forgejo-itcn-runner-3
     user: "${PUID}:${PGID}"
