@@ -1454,7 +1454,7 @@ services:
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - ${DOCKER_DIR}/praxrr:/config
-    image: ghcr.io/yandy-r/praxrr:0.7.2
+    image: ghcr.io/yandy-r/praxrr:0.8.0
 
   plex:
     <<: *service-base
