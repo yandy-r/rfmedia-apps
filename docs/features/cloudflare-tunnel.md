@@ -14,10 +14,13 @@ Tunnel hostnames live in `infra/terraform/cloudflare/terraform.tfvars`:
 ingress = {
   "tokenhop"  = { domain = "primary" }
   "plex-sync" = { domain = "media" }
+  "t3"        = { domain = "primary" }
 }
 ```
 
-These entries publish `tokenhop.${DOMAIN}` and `plex-sync.${DOMAIN2}`. Terraform derives each zone
+These entries publish `tokenhop.${DOMAIN}`, `plex-sync.${DOMAIN2}`, and `t3.${DOMAIN}`. The `t3`
+hostname is optional and only resolves to a backend while the `t3` Compose profile is deployed. See
+[T3 Code Setup](../services/t3-setup.md); omit the entry if you do not run T3 Code. Terraform derives each zone
 from the hostname's final two DNS labels and creates a proxied CNAME to
 `<tunnel_id>.cfargotunnel.com`.
 
@@ -48,6 +51,9 @@ reconfiguration after tunnel cutover.
 - Reuses existing routers, TLS certificates, and Authentik policy in `compose.yml`.
 - Keeps tunnel origin behavior consistent for every public hostname.
 - Plex intentionally has **no** Authentik middleware, required for third-party Plex token auth.
+- T3 Code (`t3`) also has **no** Authentik middleware: its clients connect over HTTP/WebSocket and
+  cannot complete a browser SSO flow. T3 device pairing is the access control. Its origin is a
+  socat bridge container that forwards to the host-run `t3code.service`.
 
 ## One-time Cloudflare setup and cutover
 

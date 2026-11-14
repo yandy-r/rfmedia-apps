@@ -144,6 +144,8 @@ Detailed setup instructions for individual services:
   configuration
 - [tokenhop Setup](services/tokenhop-setup.md) - AI gateway with native login, API keys, and Traefik
   HTTPS routing
+- [T3 Code Setup](services/t3-setup.md) - Optional `t3` profile publishing a host-run T3 Code
+  server through Traefik and the Cloudflare Tunnel
 
 ## Architecture
 

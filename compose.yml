@@ -525,6 +525,47 @@ services:
       - ${DOCKER_DIR}/tokenhop:/app/data
     image: ${TOKENHOP_IMAGE:-ghcr.io/tokenhop/tokenhop}:${TOKENHOP_TAG:-latest}
 
+  # Optional (profile `t3`, not `all`): TCP bridge from Traefik to a T3 Code server running on the
+  # Docker host (systemd user unit t3code.service). Host must bind t3 to the docker0 gateway:
+  # T3CODE_HOST=172.17.0.1 in ~/.t3/service.env. See docs/services/t3-setup.md.
+  t3:
+    <<: *service-base
+    profiles: [t3]
+    container_name: t3
+    hostname: t3
+    user: "${PUID}:${PGID}"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources: { limits: { cpus: "0.5", memory: 64M, pids: 256 } }
+    networks:
+      apps: {}
+    logging: *logging-default
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    command: TCP-LISTEN:3773,fork,reuseaddr TCP:host.docker.internal:${T3_HOST_PORT:-3773}
+    healthcheck:
+      test: ["CMD", "nc", "-z", "host.docker.internal", "${T3_HOST_PORT:-3773}"]
+      interval: 30s
+      retries: 3
+      start_period: 10s
+      timeout: 5s
+    labels:
+      traefik.enable: true
+      traefik.http.routers.t3.rule: Host(`t3.${DOMAIN}`)
+      traefik.http.routers.t3.entrypoints: websecure
+      traefik.http.routers.t3.tls: true
+      traefik.http.routers.t3.tls.certresolver: letsencrypt
+      traefik.http.routers.t3.tls.domains[0].main: t3.${DOMAIN}
+      # No Authentik: T3 clients connect over HTTP/WebSocket and can't complete a browser SSO flow.
+      # T3's own device pairing is the access control.
+      traefik.http.services.t3.loadbalancer.server.port: 3773
+      traefik.http.services.t3.loadbalancer.server.scheme: http
+    image: alpine/socat:1.8.0.3
+
   headroom:
     <<: *service-base
     container_name: headroom

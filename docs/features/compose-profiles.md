@@ -125,6 +125,10 @@ Tools for managing and monitoring the platform.
 | forgejo           | Application | Self-hosted Git forge    |
 | forgejo-postgres  | Database    | PostgreSQL for Forgejo   |
 
+Optional profile `t3` (not part of `all`) holds a single service, `t3`. It is a socat bridge that
+publishes a host-run T3 Code server at `t3.${DOMAIN}`. Enable it with `rfapps deploy -s t3 --yes` or
+`docker compose --profile t3 up -d t3`. See [T3 Code Setup](../services/t3-setup.md).
+
 ### Downloads (6 services)
 
 Download clients and indexers for content acquisition.

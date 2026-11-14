@@ -231,6 +231,15 @@ Compose sets tokenhop's `BASE_URL` and `NEXT_PUBLIC_BASE_URL` values directly to
 required for browser authentication and callback URL generation. `CLOUD_URL` and
 `NEXT_PUBLIC_CLOUD_URL` still point at `https://9router.com`, the cloud endpoint the app reads.
 
+### T3 Code (optional)
+
+Used only by the `t3` bridge service (Compose profile `t3`). See
+[T3 Code Setup](../services/t3-setup.md).
+
+| Variable       | Description                                               | Required | Default |
+| -------------- | --------------------------------------------------------- | -------- | ------- |
+| `T3_HOST_PORT` | Host port of `t3code.service` that the bridge forwards to | No       | `3773`  |
+
 ### Headroom
 
 Headroom runs as an internal-only compression service on the `apps` network. tokenhop reaches it at

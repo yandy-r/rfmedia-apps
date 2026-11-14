@@ -92,6 +92,7 @@ profiles:
     - media
     - photos
     - forgejo
+    - t3
     - all
   mapping:
     # Core services
@@ -122,6 +123,8 @@ profiles:
     forgejo-itcn-runner: forgejo
     forgejo-itcn-runner-2: forgejo
     forgejo-itcn-runner-3: forgejo
+    # T3 Code host bridge (optional: compose profile `t3`)
+    t3: t3
     # Downloads
     autobrr: downloads
     sabnzbd: downloads

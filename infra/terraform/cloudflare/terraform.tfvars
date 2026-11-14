@@ -3,4 +3,5 @@
 ingress = {
   "tokenhop"  = { domain = "primary" } # tokenhop.${DOMAIN}
   "plex-sync" = { domain = "media" }   # plex-sync.${DOMAIN2}
+  "t3"        = { domain = "primary" } # t3.${DOMAIN} (optional; needs compose profile `t3`)
 }
