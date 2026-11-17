@@ -55,7 +55,7 @@ The independently confirmed July 19, 2026 run at checkpoint
 `d651dfd41bbc591e8c60966367b3c7790550b639` used ten 1 MiB files. Quick measured 26.22× the default
 rate and 45.96× the deep rate, exceeding issue #116's 10× quick-versus-deep target for that workload.
 This is local warm-cache evidence, not a portable runtime guarantee or CI threshold. See the full
-[tiered verification benchmark results](../../../../docs/plans/tiered-verification/benchmark-results.md)
+tiered verification benchmark results (planning artifact removed; see git history)
 for the command, environment, rates, derived throughput, qualifications, and draft PR #249.
 
 ### Fixture shape
@@ -110,7 +110,7 @@ for both fixture sets, while individual representative-size paired results range
 `+112.70%`. Baseline variation was also high. The evidence therefore supports neither a performance
 regression claim nor a target-pass claim.
 
-See the complete [content-hashing benchmark results](../../../../docs/plans/content-hashing-during-copy-operations/benchmark-results.md)
+See the complete content-hashing benchmark results (planning artifact removed; see git history)
 for raw samples, medians, throughput, memory observation, environment, and limitations. Hardlink and
 conversion timing are excluded from the issue's direct byte-copy decision because the harness does
 not provide equivalent paired cases for them.

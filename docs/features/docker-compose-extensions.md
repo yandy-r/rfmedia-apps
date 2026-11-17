@@ -231,14 +231,6 @@ docker compose --profile media up -d
 - **compose.yml** - Main compose file with extensions and profiles
 - **.env.local** - Environment variables referenced by extensions
 
-### Documentation Files
-
-- **docs/plans/compose-refactor/extension-patterns.md** - Detailed pattern analysis
-- **docs/plans/compose-refactor/implementation-summary.md** - Implementation status
-- **docs/plans/compose-refactor/service-profiles.md** - Profile categorization
-- **docs/plans/compose-refactor/quick-reference.md** - Quick command reference
-- **docs/plans/compose-refactor/shared.md** - Master implementation plan
-
 ## Benefits
 
 ### Code Reduction

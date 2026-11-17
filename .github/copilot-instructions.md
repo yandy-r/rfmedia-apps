@@ -21,7 +21,7 @@ is required to merge. Use:
   instead.
 - The PR title becomes the **squash-merge commit subject verbatim** and appears in `CHANGELOG.md` /
   `git log`. Write it exactly as it should read.
-- Internal-only docs (files under `docs/plans/`, `docs/research/`, `docs/internal/`) must use
+- Internal-only docs (files under `docs/plans/`, `docs/internal/`) must use
   `docs(internal): …` so they stay out of release notes.
 
 ### Fixing a rejected title
