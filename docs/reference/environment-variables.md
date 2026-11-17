@@ -236,9 +236,10 @@ required for browser authentication and callback URL generation. `CLOUD_URL` and
 Used only by the `t3` bridge service (Compose profile `t3`). See
 [T3 Code Setup](../services/t3-setup.md).
 
-| Variable       | Description                                               | Required | Default |
-| -------------- | --------------------------------------------------------- | -------- | ------- |
-| `T3_HOST_PORT` | Host port of `t3code.service` that the bridge forwards to | No       | `3773`  |
+| Variable           | Description                                                       | Required | Default |
+| ------------------ | ----------------------------------------------------------------- | -------- | ------- |
+| `T3_UPSTREAM_HOST` | Tailnet name or IP of the dedicated host running `t3code.service` | Yes      | -       |
+| `T3_HOST_PORT`     | Port of `t3code.service` on that host that the bridge forwards to | No       | `3773`  |
 
 ### Headroom
 

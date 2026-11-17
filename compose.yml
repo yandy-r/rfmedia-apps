@@ -525,9 +525,10 @@ services:
       - ${DOCKER_DIR}/tokenhop:/app/data
     image: ${TOKENHOP_IMAGE:-ghcr.io/tokenhop/tokenhop}:${TOKENHOP_TAG:-latest}
 
-  # Optional (profile `t3`, not `all`): TCP bridge from Traefik to a T3 Code server running on the
-  # Docker host (systemd user unit t3code.service). Host must bind t3 to the docker0 gateway:
-  # T3CODE_HOST=172.17.0.1 in ~/.t3/service.env. See docs/services/t3-setup.md.
+  # Optional (profile `t3`, not `all`): TCP bridge from Traefik to a T3 Code server running on a
+  # dedicated remote host over Tailscale (systemd user unit t3code.service). The remote host must
+  # bind T3 to its tailnet IP: T3CODE_HOST=<tailnet-ip> in ~/.t3/service.env. Set T3_UPSTREAM_HOST
+  # (tailnet name or IP). See docs/services/t3-setup.md.
   t3:
     <<: *service-base
     profiles: [t3]
@@ -544,11 +545,9 @@ services:
     networks:
       apps: {}
     logging: *logging-default
-    extra_hosts:
-      - 'host.docker.internal:host-gateway'
-    command: TCP-LISTEN:3773,fork,reuseaddr TCP:host.docker.internal:${T3_HOST_PORT:-3773}
+    command: TCP-LISTEN:3773,fork,reuseaddr TCP:${T3_UPSTREAM_HOST:?set T3_UPSTREAM_HOST}:${T3_HOST_PORT:-3773}
     healthcheck:
-      test: ["CMD", "nc", "-z", "host.docker.internal", "${T3_HOST_PORT:-3773}"]
+      test: ["CMD", "nc", "-z", "${T3_UPSTREAM_HOST:?set T3_UPSTREAM_HOST}", "${T3_HOST_PORT:-3773}"]
       interval: 30s
       retries: 3
       start_period: 10s
