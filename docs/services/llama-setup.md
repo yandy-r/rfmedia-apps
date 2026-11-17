@@ -128,8 +128,8 @@ offloaded, 8161.75 MiB model buffer, 640.00 MiB KV buffer and 136.01 MiB
 compute buffer. During Qwen3-14B generation, `gpu_busy_percent` peaked at 98%
 and VRAM stayed at 9,756,102,656 bytes (~9.76 GB); offloaded weights remain
 resident between requests. Two 200-token runs measured ~49.1 tok/s completion
-and ~268–324 tok/s prompt eval. See `docs/plans/llama-amd/plan.md` for
-2026-10-03 benchmark settings and timings.
+and ~268–324 tok/s prompt eval. The 2026-10-03 benchmark settings and timings were in the
+removed planning doc `docs/plans/llama-amd/plan.md`.
 
 ## Limits
 

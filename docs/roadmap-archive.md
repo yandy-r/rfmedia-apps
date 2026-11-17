@@ -258,7 +258,7 @@ for sequencing context.
 ### Minor docs follow-up (still open)
 
 `docs/features/rfapps-lint-command.md` was noted as missing after Sprint 2; lint remains documented
-in `docs/prps/reports/` and cross-referenced from doctor/audit docs.
+in the removed planning reports (formerly `docs/prps/reports/`) and cross-referenced from doctor/audit docs.
 
 ---
 
