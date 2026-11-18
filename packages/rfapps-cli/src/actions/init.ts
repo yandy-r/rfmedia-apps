@@ -33,8 +33,19 @@ import { formatOutput } from "../lib/formatters/index.js";
 import { ConfigValidationError, ConfigNotFoundError } from "../lib/errors.js";
 import { parseComposeFile } from "../lib/validation.js";
 import { getDefaultConfigPath, getProjectConfigPath } from "../lib/config.js";
-import type { InitCommandOptions } from "../commands/init.js";
-import type { PartialRfappsConfig, Profile } from "../types/index.js";
+import type { GlobalOptions, PartialRfappsConfig, Profile } from "../types/index.js";
+
+/**
+ * Options specific to init command
+ */
+export interface InitCommandOptions extends GlobalOptions {
+  /** Write to global config location (~/.rfapps.yaml) */
+  global: boolean;
+  /** Use JSON format instead of YAML */
+  json: boolean;
+  /** Overwrite existing config file */
+  force: boolean;
+}
 
 /**
  * Auto-detect sidecar mappings based on naming pattern
