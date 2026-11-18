@@ -28,10 +28,8 @@ vi.mock("node:os", async (importOriginal) => {
 import {
   getQueuePath,
   loadQueue,
-  saveQueue,
   addJob,
   getJobs,
-  getNextPendingJob,
   updateJobStatus,
   removeJob,
   removeJobsByStatus,
@@ -114,19 +112,6 @@ describe("Queue Library", () => {
       const queue = await loadQueue();
       expect(queue.jobs).toHaveLength(1);
       expect(queue.jobs[0]?.id).toBe("test-id-123");
-    });
-  });
-
-  describe("saveQueue", () => {
-    it("should be a no-op (database writes are immediate)", async () => {
-      const queue = {
-        version: "1" as const,
-        updatedAt: "2024-01-15T10:00:00.000Z",
-        jobs: [],
-      };
-
-      // saveQueue is a no-op with the database backend
-      await expect(saveQueue(queue)).resolves.toBeUndefined();
     });
   });
 
@@ -375,29 +360,6 @@ describe("Queue Library", () => {
       const completed = await getJobs("completed");
       expect(completed).toHaveLength(1);
       expect(completed[0]?.sources).toHaveLength(2);
-    });
-  });
-
-  describe("getNextPendingJob", () => {
-    it("should return first pending job", async () => {
-      const options: SerializableCopyOptions = {
-        mode: { type: "album", range: { start: 1, end: 1, padWidth: 3 } },
-        albumOnly: false,
-        hardlink: false,
-        force: false,
-        workers: 1,
-      };
-
-      const job1 = await addJob("/source1", "/dest1", options);
-      await addJob("/source2", "/dest2", options);
-
-      const next = await getNextPendingJob();
-      expect(next?.id).toBe(job1.id);
-    });
-
-    it("should return undefined when no pending jobs", async () => {
-      const next = await getNextPendingJob();
-      expect(next).toBeUndefined();
     });
   });
 

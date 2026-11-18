@@ -442,7 +442,6 @@ const listCommand = new Command("list")
       const jobs = await executeQueueList({
         status: cmdOptions["status"] as QueueJobStatus | undefined,
         verbose: Boolean(cmdOptions["verbose"]),
-        dryRun: Boolean(globalOpts?.dryRun),
       });
 
       const format = globalOpts?.output ?? "text";

@@ -43,7 +43,6 @@ describe("executeStats - Empty Database", () => {
   it("should return empty results for empty database", async () => {
     const options: StatsOptions = {
       trackingDatabase: dbPath,
-      dryRun: false,
     };
 
     const result = await executeStats(options);
@@ -128,7 +127,6 @@ describe("executeStats - Operation Statistics", () => {
   it("should aggregate operation statistics by command", async () => {
     const options: StatsOptions = {
       trackingDatabase: dbPath,
-      dryRun: false,
     };
 
     const result = await executeStats(options);
@@ -157,7 +155,6 @@ describe("executeStats - Operation Statistics", () => {
   it("should calculate success rates by mode", async () => {
     const options: StatsOptions = {
       trackingDatabase: dbPath,
-      dryRun: false,
     };
 
     const result = await executeStats(options);
@@ -239,7 +236,6 @@ describe("executeStats - Storage Statistics", () => {
   it("should calculate total files and size", async () => {
     const options: StatsOptions = {
       trackingDatabase: dbPath,
-      dryRun: false,
     };
 
     const result = await executeStats(options);
@@ -251,7 +247,6 @@ describe("executeStats - Storage Statistics", () => {
   it("should group storage by rating ranges", async () => {
     const options: StatsOptions = {
       trackingDatabase: dbPath,
-      dryRun: false,
     };
 
     const result = await executeStats(options);
@@ -286,7 +281,6 @@ describe("executeStats - Storage Statistics", () => {
   it("should order rating ranges correctly", async () => {
     const options: StatsOptions = {
       trackingDatabase: dbPath,
-      dryRun: false,
     };
 
     const result = await executeStats(options);
@@ -342,7 +336,6 @@ describe("executeStats - JSON Output Compatibility", () => {
   it("should return result that can be serialized to JSON", async () => {
     const options: StatsOptions = {
       trackingDatabase: dbPath,
-      dryRun: false,
     };
 
     const result = await executeStats(options);

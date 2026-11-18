@@ -45,7 +45,6 @@ const mockDb = vi.hoisted(() => ({
   recordPlaylistHistory: vi.fn(),
   listSmartPlaylists: vi.fn().mockReturnValue([]),
   deleteSmartPlaylist: vi.fn().mockReturnValue(true),
-  getSmartPlaylistById: vi.fn().mockReturnValue(null),
   getSmartPlaylistHistory: vi.fn().mockReturnValue([]),
 }));
 

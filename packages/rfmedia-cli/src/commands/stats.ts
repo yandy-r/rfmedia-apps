@@ -41,7 +41,6 @@ export const statsCommand = new Command("stats")
     // Build StatsOptions from parsed command options
     const options: StatsOptions = {
       trackingDatabase: cmdOptions["trackingDatabase"] as string | undefined,
-      dryRun: Boolean(globalOpts?.dryRun),
     };
 
     try {

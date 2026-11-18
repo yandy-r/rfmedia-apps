@@ -231,8 +231,6 @@ export interface QueueListOptions {
   status?: QueueJobStatus;
   /** Show detailed job information */
   verbose: boolean;
-  /** Preview mode (no-op for list, kept for consistency) */
-  dryRun: boolean;
 }
 
 /**

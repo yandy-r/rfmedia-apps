@@ -18,8 +18,6 @@ import { logDebug, logWarn, logInfo } from "./logger.js";
 import {
   addJobToDb,
   getJobsFromDb,
-  getJobsByTypeFromDb,
-  getNextPendingJobFromDb,
   updateJobStatusInDb,
   removeJobFromDb,
   removeJobsByStatusFromDb,
@@ -153,17 +151,6 @@ export async function loadQueue(): Promise<QueueFile> {
 }
 
 /**
- * Legacy function for backward compatibility.
- * Database operations don't need explicit saving.
- *
- * @deprecated Database changes are automatically persisted
- */
-export async function saveQueue(_queue: QueueFile): Promise<void> {
-  // No-op: database writes are immediate
-  logDebug("saveQueue called (no-op with database backend)");
-}
-
-/**
  * Adds a new job to the queue.
  *
  * Supports both single-source and multi-source modes:
@@ -212,16 +199,6 @@ export async function addJob(
 export async function getJobs(status?: QueueJobStatus): Promise<QueueJob[]> {
   const db = await getDb();
   return getJobsFromDb(db, status);
-}
-
-/**
- * Gets the next pending job from the queue.
- *
- * @returns The first pending job, or undefined if no pending jobs exist
- */
-export async function getNextPendingJob(): Promise<QueueJob | undefined> {
-  const db = await getDb();
-  return getNextPendingJobFromDb(db);
 }
 
 /**
@@ -274,19 +251,4 @@ export async function removeJobsByStatus(status?: QueueJobStatus): Promise<numbe
 export async function getQueueStats(): Promise<Record<QueueJobStatus, number>> {
   const db = await getDb();
   return getQueueStatsFromDb(db);
-}
-
-/**
- * Gets jobs from the queue, filtered by job type and optionally by status.
- *
- * @param jobType - Job type to filter by ('copy' or 'delete')
- * @param status - Optional status to filter by (undefined returns all jobs of the type)
- * @returns Array of jobs matching the filters
- */
-export async function getJobsByType(
-  jobType: QueueJobType,
-  status?: QueueJobStatus,
-): Promise<QueueJob[]> {
-  const db = await getDb();
-  return getJobsByTypeFromDb(db, jobType, status);
 }

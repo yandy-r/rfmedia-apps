@@ -17,7 +17,6 @@ import type {
 import type {
   QueueJob,
   QueueJobStatus,
-  QueueJobType,
   SerializableCopyOptions,
   SerializableDeleteOptions,
 } from "../types/queue.js";
@@ -116,59 +115,6 @@ export function getJobsFromDb(db: DbConnection, status?: QueueJobStatus): QueueJ
 
   const sourcesByJob = loadSourcesForJobs(db, rows);
   return rows.map((row) => convertDbJobToQueueJob(row, sourcesByJob.get(row.id) ?? []));
-}
-
-/**
- * Gets jobs from the database filtered by job type and optionally by status.
- *
- * @param db - Database connection
- * @param jobType - Job type filter
- * @param status - Optional status filter
- * @returns Array of queue jobs
- */
-export function getJobsByTypeFromDb(
-  db: DbConnection,
-  jobType: QueueJobType,
-  status?: QueueJobStatus,
-): QueueJob[] {
-  let query = "SELECT * FROM queue_jobs WHERE job_type = ?";
-  const params: (string | QueueJobType)[] = [jobType];
-
-  if (status !== undefined) {
-    query += " AND status = ?";
-    params.push(status);
-  }
-
-  query += " ORDER BY added_at ASC";
-
-  const stmt = db.prepare(query);
-  const rows = stmt.all(...params) as DbQueueJob[];
-
-  const sourcesByJob = loadSourcesForJobs(db, rows);
-  return rows.map((row) => convertDbJobToQueueJob(row, sourcesByJob.get(row.id) ?? []));
-}
-
-/**
- * Gets the next pending job from the database.
- *
- * @param db - Database connection
- * @returns The first pending job, or undefined if none exist
- */
-export function getNextPendingJobFromDb(db: DbConnection): QueueJob | undefined {
-  const stmt = db.prepare(`
-    SELECT * FROM queue_jobs
-    WHERE status = 'pending'
-    ORDER BY added_at ASC
-    LIMIT 1
-  `);
-
-  const row = stmt.get() as DbQueueJob | undefined;
-  if (!row) {
-    return undefined;
-  }
-
-  const sourcesByJob = loadSourcesForJobs(db, [row]);
-  return convertDbJobToQueueJob(row, sourcesByJob.get(row.id) ?? []);
 }
 
 /**

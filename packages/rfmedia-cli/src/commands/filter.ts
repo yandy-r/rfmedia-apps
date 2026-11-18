@@ -81,7 +81,6 @@ filterCommand
 
     // Build FilterListOptions
     const options: FilterListOptions = {
-      dryRun: Boolean(globalOpts?.dryRun),
       plex: Boolean(cmdOpts.plex),
       namesOnly: Boolean(cmdOpts.names),
     };
@@ -130,7 +129,6 @@ filterCommand
     // Build FilterShowOptions
     const options: FilterShowOptions = {
       name,
-      dryRun: Boolean(globalOpts?.dryRun),
     };
 
     try {

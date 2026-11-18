@@ -46,7 +46,6 @@ describe("executeHistory - Empty Database", () => {
       limit: 50,
       showDuplicates: false,
       trackingDatabase: dbPath,
-      dryRun: false,
     };
 
     const result = await executeHistory(options);
@@ -108,7 +107,6 @@ describe("executeHistory - Date Filtering", () => {
       limit: 50,
       showDuplicates: false,
       trackingDatabase: dbPath,
-      dryRun: false,
     };
 
     // Should not throw
@@ -122,7 +120,6 @@ describe("executeHistory - Date Filtering", () => {
       limit: 50,
       showDuplicates: false,
       trackingDatabase: dbPath,
-      dryRun: false,
     };
 
     // Should not throw
@@ -136,7 +133,6 @@ describe("executeHistory - Date Filtering", () => {
       limit: 50,
       showDuplicates: false,
       trackingDatabase: dbPath,
-      dryRun: false,
     };
 
     // Should not throw
@@ -150,7 +146,6 @@ describe("executeHistory - Date Filtering", () => {
       limit: 50,
       showDuplicates: false,
       trackingDatabase: dbPath,
-      dryRun: false,
     };
 
     // Should not throw
@@ -164,7 +159,6 @@ describe("executeHistory - Date Filtering", () => {
       limit: 50,
       showDuplicates: false,
       trackingDatabase: dbPath,
-      dryRun: false,
     };
 
     await expect(executeHistory(options)).rejects.toThrow(/Invalid date format/);
@@ -246,7 +240,6 @@ describe("executeHistory - Mode/Status/Command Filtering", () => {
       limit: 50,
       showDuplicates: false,
       trackingDatabase: dbPath,
-      dryRun: false,
     };
 
     const result = await executeHistory(options);
@@ -261,7 +254,6 @@ describe("executeHistory - Mode/Status/Command Filtering", () => {
       limit: 50,
       showDuplicates: false,
       trackingDatabase: dbPath,
-      dryRun: false,
     };
 
     const result = await executeHistory(options);
@@ -276,7 +268,6 @@ describe("executeHistory - Mode/Status/Command Filtering", () => {
       limit: 50,
       showDuplicates: false,
       trackingDatabase: dbPath,
-      dryRun: false,
     };
 
     const result = await executeHistory(options);
@@ -294,7 +285,6 @@ describe("executeHistory - Mode/Status/Command Filtering", () => {
       limit: 50,
       showDuplicates: false,
       trackingDatabase: dbPath,
-      dryRun: false,
     };
 
     const result = await executeHistory(options);
@@ -347,7 +337,6 @@ describe("executeHistory - Limit Enforcement", () => {
       limit: 5,
       showDuplicates: false,
       trackingDatabase: dbPath,
-      dryRun: false,
     };
 
     const result = await executeHistory(options);
@@ -361,7 +350,6 @@ describe("executeHistory - Limit Enforcement", () => {
       limit: 100,
       showDuplicates: false,
       trackingDatabase: dbPath,
-      dryRun: false,
     };
 
     const result = await executeHistory(options);
@@ -435,7 +423,6 @@ describe("executeHistory - Duplicate Detection", () => {
       showDuplicates: true,
       limit: 50,
       trackingDatabase: dbPath,
-      dryRun: false,
     };
 
     const result = await executeHistory(options);
@@ -454,7 +441,6 @@ describe("executeHistory - Duplicate Detection", () => {
       showDuplicates: true,
       limit: 50,
       trackingDatabase: dbPath,
-      dryRun: false,
     };
 
     const result = await executeHistory(options);
@@ -472,7 +458,6 @@ describe("executeHistory - Duplicate Detection", () => {
       showDuplicates: false,
       limit: 50,
       trackingDatabase: dbPath,
-      dryRun: false,
     };
 
     const result = await executeHistory(options);
@@ -519,7 +504,6 @@ describe("executeHistory - JSON Output Compatibility", () => {
       showDuplicates: true,
       limit: 50,
       trackingDatabase: dbPath,
-      dryRun: false,
     };
 
     const result = await executeHistory(options);

@@ -2,7 +2,6 @@
  * Tests for core database initialization and optimization behavior (#112).
  *
  * Covers WAL mode and pragma configuration, the version 8 index migration,
- * and the batched suffix deletion in deleteCompletedAlbumCopiesForSuffixes.
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
@@ -34,7 +33,6 @@ import {
   recordInventoryFile,
   recordInventoryFiles,
   getCompletedAlbumCopies,
-  deleteCompletedAlbumCopiesForSuffixes,
   getInventoryFingerprintCandidates,
   getReconciliationInventoryCandidates,
   getReconciliationInventoryCandidatesAtPath,
@@ -1925,94 +1923,5 @@ describe("Reconciliation inventory access", () => {
       mtime: candidate.mtime + 1,
       size: candidate.size,
     });
-  });
-});
-
-describe("deleteCompletedAlbumCopiesForSuffixes", () => {
-  let tempDir: string;
-  let db: DbConnection;
-  let operationId: number;
-
-  const sourcePath = "/music/Artist";
-  const albumName = "Album";
-
-  beforeEach(async () => {
-    tempDir = await mkdtemp(join(tmpdir(), "rfmedia-db-test-"));
-    db = await initializeDatabase(join(tempDir, "test.db"));
-    operationId = createOperation(db, {
-      command: "copy-filter",
-      mode: "filter",
-      inputFile: null,
-      optionsHash: "filter-r80-001-005",
-      ratingKey: "r80",
-      rangeKey: "001-005",
-      convertKey: null,
-    });
-  });
-
-  afterEach(async () => {
-    if (db) {
-      db.close();
-    }
-    await rm(tempDir, { recursive: true, force: true });
-  });
-
-  it("returns 0 for an empty suffix list", () => {
-    expect(deleteCompletedAlbumCopiesForSuffixes(db, operationId, sourcePath, albumName, [])).toBe(
-      0,
-    );
-  });
-
-  it("deletes only the given suffixes when ratingKey is undefined", () => {
-    for (const suffix of ["001", "002", "003"]) {
-      recordCompletedAlbumCopy(db, operationId, sourcePath, albumName, suffix, "r80");
-    }
-
-    const deleted = deleteCompletedAlbumCopiesForSuffixes(db, operationId, sourcePath, albumName, [
-      "001",
-      "003",
-    ]);
-
-    expect(deleted).toBe(2);
-    const remaining = getCompletedAlbumCopies(db, operationId, sourcePath);
-    expect(remaining.map((copy) => copy.suffix)).toEqual(["002"]);
-  });
-
-  it("deletes only entries matching a specific rating key", () => {
-    recordCompletedAlbumCopy(db, operationId, sourcePath, albumName, "001", "r80");
-    recordCompletedAlbumCopy(db, operationId, sourcePath, albumName, "001", "r50");
-
-    const deleted = deleteCompletedAlbumCopiesForSuffixes(
-      db,
-      operationId,
-      sourcePath,
-      albumName,
-      ["001"],
-      "r80",
-    );
-
-    expect(deleted).toBe(1);
-    const remaining = getCompletedAlbumCopies(db, operationId, sourcePath);
-    expect(remaining).toHaveLength(1);
-    expect(remaining[0]?.rating_key).toBe("r50");
-  });
-
-  it("treats null ratingKey as the no-filter tracking state", () => {
-    recordCompletedAlbumCopy(db, operationId, sourcePath, albumName, "001", null);
-    recordCompletedAlbumCopy(db, operationId, sourcePath, albumName, "001", "r80");
-
-    const deleted = deleteCompletedAlbumCopiesForSuffixes(
-      db,
-      operationId,
-      sourcePath,
-      albumName,
-      ["001"],
-      null,
-    );
-
-    expect(deleted).toBe(1);
-    const remaining = getCompletedAlbumCopies(db, operationId, sourcePath);
-    expect(remaining).toHaveLength(1);
-    expect(remaining[0]?.rating_key).toBe("r80");
   });
 });

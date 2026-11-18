@@ -36,8 +36,6 @@ import { isMediaFilterRule, isMediaFilterGroup } from "../types/media-filters.js
  * Options for the filter list action.
  */
 export interface FilterListOptions {
-  /** Preview mode (no-op for filter list, kept for consistency) */
-  dryRun: boolean;
   /** List Plex filters from config.plexFilters instead of config.filters */
   plex?: boolean;
   /** Output only filter names, one per line (for shell completion) */
@@ -50,8 +48,6 @@ export interface FilterListOptions {
 export interface FilterShowOptions {
   /** Name of the filter to show */
   name: string;
-  /** Preview mode (no-op for filter show, kept for consistency) */
-  dryRun: boolean;
 }
 
 /**
