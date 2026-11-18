@@ -344,8 +344,7 @@ docker run --rm data.forgejo.org/forgejo/runner:12 \
 sudo chown "${PUID}:${PGID}" "${DOCKER_DIR}/forgejo-runner/runner-config.yml"
 ```
 
-Edit `${DOCKER_DIR}/forgejo-runner/runner-config.yml` and add runner labels. The legacy Gitea runner
-config at `config/gitea/runners/runner1.yaml` shows useful label examples:
+Edit `${DOCKER_DIR}/forgejo-runner/runner-config.yml` and add runner labels. Useful label examples:
 
 ```yaml
 runner:
