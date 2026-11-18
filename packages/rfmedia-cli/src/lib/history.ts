@@ -5,7 +5,7 @@
  * for later undo operations. Each command invocation creates a session file.
  */
 
-import { appendFile, mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { homedir } from "node:os";
 
@@ -55,16 +55,6 @@ const DEFAULT_HISTORY_DIR = join(homedir(), ".rfmedia", "history");
 export function getHistoryDir(): string {
   const config = getLoadedConfig();
   return config.undo?.historyPath ?? DEFAULT_HISTORY_DIR;
-}
-
-/**
- * Gets the default history directory path (ignoring config).
- * Used for initial setup before config is loaded.
- *
- * @returns Default history directory path
- */
-export function getDefaultHistoryDir(): string {
-  return DEFAULT_HISTORY_DIR;
 }
 
 /**
@@ -717,82 +707,6 @@ export async function updateSessionStatus(
   await writeFile(filePath, lines.join("\n") + "\n", "utf-8");
 
   logDebug(`Updated session ${sessionId} status to: ${status}`);
-}
-
-/**
- * Cleans up old history files based on retention policy.
- *
- * @param retentionDays - Number of days to retain history (default: 30)
- * @returns Number of files deleted
- */
-export async function cleanupOldHistory(retentionDays?: number): Promise<number> {
-  const config = getLoadedConfig();
-  const days = retentionDays ?? config.undo?.retentionDays ?? 30;
-  const historyDir = getHistoryDir();
-
-  if (!(await pathExists(historyDir))) {
-    return 0;
-  }
-
-  const cutoffDate = new Date();
-  cutoffDate.setDate(cutoffDate.getDate() - days);
-
-  const entries = await readdir(historyDir, { withFileTypes: true });
-  let deletedCount = 0;
-
-  for (const entry of entries) {
-    if (!entry.isFile() || !entry.name.endsWith(".jsonl")) continue;
-
-    const filePath = join(historyDir, entry.name);
-
-    try {
-      const stats = await stat(filePath);
-
-      if (stats.mtime < cutoffDate) {
-        await remove(filePath);
-        deletedCount++;
-        logDebug(`Cleaned up old history file: ${entry.name}`);
-      }
-    } catch {
-      // Skip files that can't be accessed
-    }
-  }
-
-  if (deletedCount > 0) {
-    logDebug(`Cleaned up ${deletedCount} old history file(s)`);
-  }
-
-  return deletedCount;
-}
-
-/**
- * Gets the total size of the history directory in bytes.
- *
- * @returns Total size in bytes
- */
-export async function getHistoryDirSize(): Promise<number> {
-  const historyDir = getHistoryDir();
-
-  if (!(await pathExists(historyDir))) {
-    return 0;
-  }
-
-  const entries = await readdir(historyDir, { withFileTypes: true });
-  let totalSize = 0;
-
-  for (const entry of entries) {
-    if (!entry.isFile()) continue;
-
-    const filePath = join(historyDir, entry.name);
-    try {
-      const stats = await stat(filePath);
-      totalSize += stats.size;
-    } catch {
-      // Skip files that can't be accessed
-    }
-  }
-
-  return totalSize;
 }
 
 export interface LegacyHistoryMigrationFailure {

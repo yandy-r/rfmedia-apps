@@ -260,14 +260,6 @@ flowchart TD
         R3["Log: Recorded completed album copy"]
     end
 
-    subgraph Complete["Check Full Completion"]
-        C1["isSourceFullyCompleted(db, operationId, sourcePath, albumNames, suffixes, ratingKey)"]
-        C2["SELECT COUNT(*) FROM completed_album_copies<br/>WHERE all expected combinations exist"]
-        C3{count == expected?}
-        C4["Source fully completed"]
-        C5["Source partially completed"]
-    end
-
     %% Connections
     I1 --> I2 --> I3
     I3 -->|Yes| I4 --> I6
@@ -283,25 +275,18 @@ flowchart TD
     F6 --> R1
     R1 --> R2 --> R3
 
-    R3 --> C1
-    C1 --> C2 --> C3
-    C3 -->|Yes| C4
-    C3 -->|No| C5
-
     %% Styling
     classDef init fill:#e3f2fd,stroke:#1565c0
     classDef load fill:#e8f5e9,stroke:#2e7d32
     classDef filter fill:#fff3e0,stroke:#ef6c00
     classDef record fill:#f3e5f5,stroke:#7b1fa2
-    classDef complete fill:#fce4ec,stroke:#c2185b
     classDef decision fill:#ffecb3,stroke:#ffa000
 
     class I1,I2,I4,I5,I6 init
     class L1,L2,L3,L4 load
     class F1,F2,F3,F4,F5,F6 filter
     class R1,R2,R3 record
-    class C1,C2,C4,C5 complete
-    class I3,C3 decision
+    class I3 decision
 ```
 
 ## Rating-Aware Tracking

@@ -251,9 +251,9 @@ async function withActionExecutionLock<TResult>(execute: () => Promise<TResult>)
 }
 
 export async function invokeFilterList(
-  args: FilterListToolArgs,
+  _args: FilterListToolArgs,
 ): Promise<Awaited<ReturnType<typeof executeFilterList>>> {
-  return runAdapter(async () => executeFilterList({ dryRun: args.dryRun ?? false }));
+  return runAdapter(async () => executeFilterList({}));
 }
 
 export async function invokeFilterShow(
@@ -262,7 +262,6 @@ export async function invokeFilterShow(
   return runAdapter(async () =>
     executeFilterShow({
       name: args.name,
-      dryRun: args.dryRun ?? false,
     }),
   );
 }

@@ -1039,17 +1039,15 @@ To preserve interactive selections, use the database-based queue (automatic afte
 
 #### Queue Operations (`src/lib/queue.ts`)
 
-| Function                                       | Description                                       |
-| ---------------------------------------------- | ------------------------------------------------- |
-| `getQueuePath()`                               | Returns path to legacy JSON file (for migration)  |
-| `addJob(src, dest, opts, jobType, selection?)` | Creates and inserts job to database               |
-| `getJobs(status?)`                             | Returns jobs from database, optionally filtered   |
-| `getJobsByType(jobType, status?)`              | Returns jobs filtered by type and optional status |
-| `getNextPendingJob()`                          | Returns first pending job from database           |
-| `updateJobStatus(id, status, error?)`          | Updates job status and timestamps in database     |
-| `removeJob(jobId)`                             | Removes job from database (CASCADE deletes)       |
-| `removeJobsByStatus(status?)`                  | Removes jobs matching status (or all)             |
-| `getQueueStats()`                              | Returns counts by status from database            |
+| Function                                       | Description                                      |
+| ---------------------------------------------- | ------------------------------------------------ |
+| `getQueuePath()`                               | Returns path to legacy JSON file (for migration) |
+| `addJob(src, dest, opts, jobType, selection?)` | Creates and inserts job to database              |
+| `getJobs(status?)`                             | Returns jobs from database, optionally filtered  |
+| `updateJobStatus(id, status, error?)`          | Updates job status and timestamps in database    |
+| `removeJob(jobId)`                             | Removes job from database (CASCADE deletes)      |
+| `removeJobsByStatus(status?)`                  | Removes jobs matching status (or all)            |
+| `getQueueStats()`                              | Returns counts by status from database           |
 
 #### Queue Database Operations (`src/lib/queue-db.ts`)
 

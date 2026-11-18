@@ -564,7 +564,6 @@ describe("barrel re-export surface", () => {
     expect(typeof lidarrBarrel.LidarrValidationError).toBe("function");
     expect(typeof lidarrBarrel.classifyLidarrStatus).toBe("function");
     expect(typeof lidarrBarrel.parseRetryAfter).toBe("function");
-    expect(typeof lidarrBarrel.runHealthGate).toBe("function");
     expect(lidarrBarrel.LIDARR_TIER_DESCRIPTORS).toBeDefined();
   });
 });

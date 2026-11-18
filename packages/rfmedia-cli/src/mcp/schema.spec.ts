@@ -6,9 +6,7 @@ import { RFMEDIA_MCP_TOOL_NAMES, rfmediaMcpSchemas } from "./schema.js";
 
 describe("rfmedia MCP schemas", () => {
   it("parses valid inputs for all rfmedia MCP tools", () => {
-    expect(rfmediaMcpSchemas.filterList.input.parse({ dryRun: true })).toMatchObject({
-      dryRun: true,
-    });
+    expect(rfmediaMcpSchemas.filterList.input.parse({})).toEqual({});
 
     expect(rfmediaMcpSchemas.filterShow.input.parse({ name: "liked" })).toMatchObject({
       name: "liked",

@@ -468,8 +468,6 @@ export type DateFilter = string;
 export interface StatsOptions {
   /** Custom path to SQLite tracking database */
   trackingDatabase?: string;
-  /** Preview mode (no-op for stats, kept for consistency) */
-  dryRun: boolean;
 }
 
 /**
@@ -492,8 +490,6 @@ export interface HistoryOptions {
   showDuplicates: boolean;
   /** Custom path to SQLite tracking database */
   trackingDatabase?: string;
-  /** Preview mode (no-op for history, kept for consistency) */
-  dryRun: boolean;
 }
 
 /**

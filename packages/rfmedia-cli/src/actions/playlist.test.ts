@@ -114,7 +114,6 @@ const mockDb = vi.hoisted(() => ({
   }),
   createSmartPlaylist: vi.fn().mockReturnValue(1),
   getSmartPlaylist: vi.fn().mockReturnValue(null),
-  getSmartPlaylistById: vi.fn().mockReturnValue(null),
   listSmartPlaylists: vi.fn().mockReturnValue([]),
   updateSmartPlaylist: vi.fn(),
   deleteSmartPlaylist: vi.fn().mockReturnValue(true),
@@ -154,7 +153,6 @@ vi.mock("../lib/db.js", () => ({
   initializeDatabase: mockDb.initializeDatabase,
   createSmartPlaylist: mockDb.createSmartPlaylist,
   getSmartPlaylist: mockDb.getSmartPlaylist,
-  getSmartPlaylistById: mockDb.getSmartPlaylistById,
   listSmartPlaylists: mockDb.listSmartPlaylists,
   updateSmartPlaylist: mockDb.updateSmartPlaylist,
   deleteSmartPlaylist: mockDb.deleteSmartPlaylist,
@@ -287,7 +285,6 @@ function resetMocksToDefaults() {
   });
   mockDb.createSmartPlaylist.mockReturnValue(1);
   mockDb.getSmartPlaylist.mockReturnValue(null);
-  mockDb.getSmartPlaylistById.mockReturnValue(null);
   mockDb.listSmartPlaylists.mockReturnValue([]);
   mockDb.updateSmartPlaylist.mockImplementation(() => {});
   mockDb.deleteSmartPlaylist.mockReturnValue(true);

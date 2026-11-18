@@ -55,13 +55,13 @@ describe("rfmedia MCP adapters", () => {
     setLoadedConfig({});
   });
 
-  it("translates filter list args with dryRun default", async () => {
+  it("translates filter list args", async () => {
     vi.mocked(executeFilterList).mockResolvedValue({ filters: [], total: 0 });
 
     const result = await invokeFilterList({});
 
     expect(result).toMatchObject({ total: 0 });
-    expect(executeFilterList).toHaveBeenCalledWith({ dryRun: false });
+    expect(executeFilterList).toHaveBeenCalledWith({});
   });
 
   it("translates copy album args to action options", async () => {

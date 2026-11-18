@@ -77,7 +77,6 @@ export const historyCommand = new Command("history")
       limit: (cmdOptions["limit"] as number) ?? 50,
       showDuplicates: Boolean(cmdOptions["showDuplicates"]),
       trackingDatabase: cmdOptions["trackingDatabase"] as string | undefined,
-      dryRun: Boolean(globalOpts?.dryRun),
     };
 
     try {

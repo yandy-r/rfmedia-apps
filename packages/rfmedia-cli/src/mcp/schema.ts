@@ -31,13 +31,10 @@ import type {
   PlexTrack,
 } from "../types/plex.js";
 
-export interface FilterListToolArgs {
-  dryRun?: boolean;
-}
+export interface FilterListToolArgs {}
 
 export interface FilterShowToolArgs {
   name: string;
-  dryRun?: boolean;
 }
 
 export type McpConvertFormat = "alac" | "mp3" | "aac" | "opus";
@@ -476,15 +473,12 @@ export interface RfmediaMcpToolSchema<TArgs, TResult> {
 
 export const rfmediaMcpSchemas = {
   filterList: {
-    input: schemaObject({
-      dryRun: schemaOptional(schemaBoolean()),
-    }),
+    input: schemaObject({}),
     output: filterListResultSchema,
   },
   filterShow: {
     input: schemaObject({
       name: schemaString(),
-      dryRun: schemaOptional(schemaBoolean()),
     }),
     output: filterShowResultSchema,
   },
