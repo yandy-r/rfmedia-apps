@@ -82,11 +82,7 @@ export type { ProgressContext, TaskListOptions } from "./progress.js";
 export { confirm, confirmWithDefault, prompt } from "./prompt.js";
 
 // Interactive utilities
-export {
-  isInteractiveEnvironment,
-  isTerminalInteractive,
-  withCancellation,
-} from "./interactive.js";
+export { isInteractiveEnvironment } from "./interactive.js";
 
 // Secrets injection utilities
 export {

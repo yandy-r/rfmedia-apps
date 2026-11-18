@@ -35,8 +35,6 @@ export {
 export {
   execDocker,
   execDockerCompose,
-  isDockerAvailable,
-  getDockerComposeVersion,
   listContainers,
   getContainerStats,
   pullImages,
@@ -47,7 +45,6 @@ export {
   removeServices,
   pruneImages,
   pruneVolumes,
-  getLogs,
   validateComposeFile,
   getComposeServices,
   getRunningContainers,
